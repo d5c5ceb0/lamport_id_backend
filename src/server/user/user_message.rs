@@ -9,7 +9,7 @@ use std::convert::Into;
 pub struct PointsResponse {
     pub point: u64,
     pub invite_count: u64,
-    pub power: u64,
+    pub energy: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -24,6 +24,7 @@ pub struct User {
     pub address: Option<String>,
     pub x_id: String,
     pub username: String,
+    pub image: String,
     pub invited_by: Option<String>,
     pub invite_code: String,
 }
@@ -36,6 +37,7 @@ impl From<OauthUserInfo> for User {
             address: None,
             x_id: item.data.id,
             username: item.data.username,
+            image: item.data.profile_image_url,
             invited_by: None,
             invite_code: user_service::gen_invite_code(8),
         }
@@ -58,6 +60,7 @@ impl Into<users::ActiveModel> for User {
             address: Set(self.address),
             x_id: Set(self.x_id),
             user_name: Set(self.username),
+            image: Set(self.image),
             invited_by: Set(self.invited_by),
             invite_code: Set(self.invite_code),
             created_at: Set(Some(chrono::Utc::now().into())),
@@ -72,6 +75,7 @@ pub struct UserResponse {
     pub name: String,
     pub invite_code: String,
     pub invited_by: Option<String>,
+    pub image: String,
 }
 
 impl From<users::Model> for UserResponse {
@@ -81,6 +85,7 @@ impl From<users::Model> for UserResponse {
             name: user.name,
             invite_code: user.invite_code,
             invited_by: user.invited_by,
+            image: user.image,
         }
     }
 }

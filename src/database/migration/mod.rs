@@ -5,9 +5,8 @@ mod m20241225_025628_create_points_table;
 mod m20250114_025944_create_proposal_table;
 mod m20250114_050441_create_vote_table;
 mod m20250114_052617_create_power_table;
-mod m20250114_054422_create_vote_option_table;
-mod m20250114_055338_create_proposal_options_table;
 mod m20250116_063026_create_lamport_id_table;
+mod m20250116_131947_create_group_table;
 
 pub struct Migrator;
 
@@ -20,9 +19,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20250114_025944_create_proposal_table::Migration),
             Box::new(m20250114_050441_create_vote_table::Migration),
             Box::new(m20250114_052617_create_power_table::Migration),
-            Box::new(m20250114_054422_create_vote_option_table::Migration),
-            Box::new(m20250114_055338_create_proposal_options_table::Migration),
             Box::new(m20250116_063026_create_lamport_id_table::Migration),
+            Box::new(m20250116_131947_create_group_table::Migration),
         ]
     }
 }

@@ -6,5 +6,8 @@ mod router;
 mod server;
 mod user;
 mod webset;
+mod group;
+mod proposal;
+mod vote;
 
 pub use server::http_server_start;

@@ -16,6 +16,7 @@ pub struct Model {
     pub name: String,
     #[sea_orm(unique)]
     pub user_name: String,
+    pub image: String,
     #[sea_orm(unique)]
     pub invite_code: String,
     pub invited_by: Option<String>,

@@ -11,10 +11,11 @@ impl MigrationTrait for Migration {
                 Table::create()
                 .table(Vote::Table)
                 .col(ColumnDef::new(Vote::Id).integer().primary_key().auto_increment())
-                .col(ColumnDef::new(Vote::ProposalId).uuid().not_null())
-                .col(ColumnDef::new(Vote::VoterId).uuid().not_null())
-                .col(ColumnDef::new(Vote::CreatedAt).timestamp().not_null())
-                .col(ColumnDef::new(Vote::UpdatedAt).timestamp().not_null())
+                .col(ColumnDef::new(Vote::VoterId).string().not_null())
+                .col(ColumnDef::new(Vote::ProposalId).string().not_null())
+                .col(ColumnDef::new(Vote::Choice).string().not_null())
+                .col(ColumnDef::new(Vote::Channel).string().not_null())
+                .col(ColumnDef::new(Vote::CreatedAt).timestamp_with_time_zone().not_null())
                 .to_owned(),
         )
             .await
@@ -32,9 +33,10 @@ impl MigrationTrait for Migration {
 enum Vote {
     Table,
     Id,
-    ProposalId,
     VoterId,
+    ProposalId,
+    Choice,
+    Channel,
     CreatedAt,
-    UpdatedAt,
 }
 

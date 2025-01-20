@@ -49,12 +49,12 @@ pub async fn get_user_invites(
         Err(e) => return Err(e),
     };
 
-    let power= match state.store.get_user_power(claim.sub.as_ref()).await {
+    let energy = match state.store.get_user_power(claim.sub.as_ref()).await {
         Ok(v) => v as u64,
         Err(e) => return Err(e),
     };
 
     Ok(Json(serde_json::json!({
-    "result": PointsResponse{point, invite_count, power}
+    "result": PointsResponse{point, invite_count, energy}
     })))
 }

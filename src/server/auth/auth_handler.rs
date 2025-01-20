@@ -38,10 +38,10 @@ pub async fn auth_token(
     let client = state
         .oauth
         .clone()
-        .set_redirect_uri(RedirectUrl::new(params.redirect_uri.unwrap().clone())?);
+        .set_redirect_uri(RedirectUrl::new(params.clone().redirect_uri.unwrap().clone())?);
         //.set_redirect_uri(RedirectUrl::new(state.config.auth.redirect_url.clone())?);
 
-    let csrf_state = params
+    let csrf_state = params.clone()
         .state
         .ok_or(AppError::InputValidateError("Invild state".into()))?;
 
@@ -57,13 +57,24 @@ pub async fn auth_token(
 
     let client = Client::new();
 
+    //let token_params = [
+    //    ("code", params.code.unwrap()),
+    //    ("grant_type", "authorization_code".into()),
+    //    ("client_id", "Q1oxNk1mWUVwZTF6Zm91U3NudUY6MTpjaQ".into()),
+    //    ("redirect_uri", "http://127.0.0.1:8080/api/v1/auth/callback".into()),
+    //    ("code_verifier", "challenge".into()),
+    //];
+
     let token_params = [
-        ("code", params.code.unwrap()),
+        ("code", params.clone().code.unwrap()),
         ("grant_type", "authorization_code".into()),
         ("client_id", "Q1oxNk1mWUVwZTF6Zm91U3NudUY6MTpjaQ".into()),
-        ("redirect_uri", "http://127.0.0.1:8080/api/v1/auth/callback".into()),
+        ("redirect_uri", params.clone().redirect_uri.unwrap()),
         ("code_verifier", "challenge".into()),
     ];
+
+    tracing::info!("[auth_token] exchange code params: {:?}", token_params);
+
 
     let token_response= client
         .post("https://api.x.com/2/oauth2/token")
@@ -101,6 +112,7 @@ pub async fn auth_token(
     let user_info_response = client
         .get("https://api.x.com/2/users/me")
         .bearer_auth(&access_token)
+        .query(&[("user.fields", "profile_image_url")])
         .send()
         .await
         .map_err(|_e| AppError::RequestError("failed to get user info".to_string()))?;

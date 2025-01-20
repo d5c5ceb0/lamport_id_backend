@@ -10,7 +10,7 @@ pub struct OAuthCallbackParams {
     pub state: String,
 }
 
-#[derive(Deserialize, Debug, Validate)]
+#[derive(Deserialize, Debug, Validate, Clone)]
 pub struct OAuthParams {
     #[validate(length(min = 1, message = "Code cannot be empty"))]
     pub code: Option<String>,
@@ -52,4 +52,5 @@ pub struct UserInfo {
     pub id: String,
     pub name: String,
     pub username: String,
+    pub profile_image_url: String,
 }

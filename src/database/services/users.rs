@@ -9,7 +9,7 @@ use sea_orm::prelude::Expr;
 use sea_orm::*;
 
 impl Storage {
-    pub async fn create_user(&self, active_user: users::ActiveModel) -> AppResult<users::Model> {
+    pub async fn create_user(&self, mut active_user: users::ActiveModel) -> AppResult<users::Model> {
         tracing::info!("user model: {:?}", active_user);
 
         let user_uid: String = active_user
@@ -20,6 +20,7 @@ impl Storage {
             ))?
             .to_string();
 
+
         let user_invite_code: String = active_user
             .get(users::Column::InviteCode)
             .try_as_ref()
@@ -28,6 +29,7 @@ impl Storage {
             ))?
             .to_string();
 
+        let user_uid =  self.get_current_lamport_id().await.unwrap().to_string();
 
         //let user: users::Model = active_user.clone().try_into_model()?;
         match self
@@ -43,7 +45,10 @@ impl Storage {
             false => (),
         }
 
+        active_user.lamport_id = Set(user_uid.clone());
+
         let created_user = active_user.insert(self.conn.as_ref()).await?;
+        self.increase_lamport_id().await.unwrap();
 
         Ok(created_user)
     }

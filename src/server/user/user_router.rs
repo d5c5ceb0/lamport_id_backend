@@ -7,7 +7,7 @@ pub fn user_router(state: SharedState) -> Router<SharedState> {
     Router::new()
         .route("/info", get(get_user_info))
         .route("/count", get(get_user_count))
-        .route("/points", get(get_user_invites))
+        .route("/stats", get(get_user_invites))
         .layer(middleware::from_fn_with_state(
             state,
             middlewares::auth_middleware,
