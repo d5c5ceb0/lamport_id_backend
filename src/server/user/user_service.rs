@@ -1,6 +1,7 @@
 use rand::{distributions::Alphanumeric, Rng};
 use uuid::Uuid;
 
+#[allow(dead_code)]
 pub fn gen_uid() -> String {
     Uuid::new_v4().to_string()
 }

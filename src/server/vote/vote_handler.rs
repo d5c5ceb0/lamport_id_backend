@@ -1,8 +1,11 @@
 use super::vote_message::*;
-use crate::{app::SharedState, common::error::AppResult, server::middlewares::AuthToken};
+use crate::{
+    app::SharedState, 
+    common::error::{AppResult, AppError}, 
+    server::{middlewares::AuthToken, proposal::proposal_service::get_proposal_status}, 
+    common::consts,
+};
 use axum::{debug_handler, extract::Path, extract::State, extract::Query, extract::Json as EJson, Json};
-use crate::database::entities::vote;
-use sea_orm::*;
 
 
 //impl axum create vote handler
@@ -15,11 +18,44 @@ pub async fn create_vote(
     let client = state.jwt_handler.clone();
     let claim = client.decode_token(user).unwrap();
 
-    vote_info.voter_id = Some(claim.sub);
+    //check energy
+    let energy = state.store.get_user_power(claim.sub.as_str()).await?;
+    if energy < (consts::ENERGY_PROPOSAL_VALUE as i64) {
+        return Err(AppError::InputValidateError("energy not enough".into()));
+    }
+    //check vote_info.proposal_id, proposal_id must be in database, porposal_id must be active
+    let proposal = state.store.get_proposal_by_proposal_id(vote_info.proposal_id.as_str()).await?;
+    if get_proposal_status(proposal.start_time.into(), proposal.end_time.into()) != consts::PROPOSAL_STATUS_ACTIVE {
+        return Err(AppError::InputValidateError("proposal not active".into()));
+    }
+
+    //checkout vote_info.choice, choice must be in proposal options
+    if !proposal.options.contains(&vote_info.choice) {
+        return Err(AppError::InputValidateError("choice not in proposal options".into()));
+    }
+
+    //checkout vote_info.voter_id, voter_id must not be voted before
+    if state.store.is_voted_by_voter_id(claim.sub.as_str(), vote_info.proposal_id.as_str()).await? {
+        return Err(AppError::InputValidateError("voter has voted before".into()));
+    }
+
+    vote_info.voter_id = Some(claim.sub.clone());
 
     let active_vote = vote_info.into();
 
     let created_vote = state.store.create_vote(active_vote).await?;
+
+    //award point
+    state
+        .store
+        .award_points(claim.sub.clone(), consts::POINTS_VOTE, consts::POINTS_VOTE_VALUE, "vote reward")
+        .await?;
+
+    //consume energy 
+    state
+        .store
+        .create_energy(claim.sub.clone(), consts::ENERGY_VOTE, consts::ENERGY_VOTE_VALUE)
+        .await?;
 
     Ok(Json(serde_json::json!({
         "result": VoteInfo::from(created_vote)
@@ -56,6 +92,7 @@ pub async fn get_votes_by_voter_id(
     Path(voter_id): Path<String>,
     Query(params): Query<GetVotesRequest>,
 ) -> AppResult<Json<serde_json::Value>> {
+    tracing::info!("voter_id: {:?}", voter_id);
 
     let offset = params.offset;
     let limit = params.limit;

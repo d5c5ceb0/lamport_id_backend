@@ -2,10 +2,10 @@
 
 pub mod prelude;
 
-pub mod group;
+pub mod groups;
 pub mod lamport_id;
 pub mod points;
 pub mod power;
-pub mod proposal;
+pub mod proposals;
 pub mod users;
 pub mod vote;

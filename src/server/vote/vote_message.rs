@@ -1,5 +1,3 @@
-use crate::{app::SharedState, common::error::AppResult, server::middlewares::AuthToken};
-use axum::{debug_handler, extract::Path,extract::State,extract::Query,extract::Json as EJson, Json};
 use crate::database::entities::vote;
 use sea_orm::*;
 

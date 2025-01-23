@@ -1,21 +1,24 @@
 use crate::{
-    common::{config::Config, consts, error::AppResult},
+    common::{config::Config, consts, error::{AppResult,AppError}},
     database,
     helpers::google_auth,
     server::{http_server_start, middlewares::jwt::jwt_handler},
+    nostr, 
+    queue::msg_queue::{MessageQueue, RedisMessage, RedisStreamPool},
 };
 use std::ops::Deref;
 use std::{path::PathBuf, sync::Arc};
-//use tokio::sync::RwLock;
 use oauth2::basic::BasicClient;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct AppState {
     pub config: Config,
     pub store: database::Storage,
     pub jwt_handler: jwt_handler::JwtHandler,
     pub oauth: BasicClient,
     pub redis: redis::Client,
+    pub queue: RedisStreamPool,
+    pub nclient: nostr::NostrClient,
 }
 
 impl AppState {
@@ -31,12 +34,18 @@ impl AppState {
             store,
             jwt_handler,
             oauth: google_auth::oauth_client(config.auth),
-            redis: redis::Client::open(config.redis.redis_url).unwrap(),
+            redis: redis::Client::open(config.redis.redis_url.as_str()).unwrap(),
+            queue: RedisStreamPool::new(config.redis.redis_url.as_str()).await.unwrap(),
+            nclient: nostr::NostrClient::new(
+                config.nostr.priv_key.as_str(),
+                Some(config.nostr.ws_url.as_str()),
+            ).await.unwrap()
         }
     }
+
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct SharedState(pub Arc<AppState>);
 
 impl Deref for SharedState {
@@ -54,8 +63,78 @@ impl SharedState {
     }
 
     pub async fn run(&self) -> AppResult<()> {
+        let nclient = self.nclient.clone();
+        let queue = self.queue.clone();
+        let queue_topic = self.config.redis.topic.clone();
+        tokio::spawn(async move {
+            loop {
+                match queue.consume(&queue_topic).await {
+                    Ok(msgs) => {
+                        for (_k, m) in msgs.iter().enumerate() {
+                            //Deserialize data
+                            let (_id, msg): (String, nostr::LamportBinding) = match serde_json::from_str(m.data.as_str()) {
+                                Ok(parsed) => parsed,
+                                Err(e) => {
+                                    tracing::error!("Failed to parse message: {}, error: {:?}", m.data, e);
+                                    if let Err(e) = queue.acknowledge(&queue_topic, &m.id).await {
+                                        tracing::error!(
+                                            "Failed to acknowledge message: {}, error: {:?}",
+                                            m.id,
+                                            e
+                                        );
+                                    }
+                                    continue;
+                                }
+                            };
+
+                            nclient.sign_and_send(&msg).await.unwrap();
+
+
+                            // ack
+                            if let Err(e) = queue.acknowledge(&queue_topic, &m.id).await {
+                                tracing::error!("Failed to acknowledge message: {}, error: {:?}", m.id, e);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to consume messages from queue: {:?}", e);
+                        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                    }
+                }
+            }
+        });
+
+
         http_server_start(self.clone()).await?;
 
         Ok(())
     }
+}
+
+impl RedisStreamPool {
+    #[allow(dead_code)]
+    async fn add_queue_req(
+        &self,
+        topic: &str,
+        id: String,
+        p: serde_json::Value,
+    ) -> AppResult<()> {
+        let redis_msg = match RedisMessage::new((id, p)) {
+            Ok(v) => v,
+            Err(e) => {
+                tracing::error!("redis message new error: {:?}", e);
+                return Err(AppError::CustomError("redis msg new error".into()));
+            }
+        };
+        tracing::info!("Product message: data={:?}", redis_msg);
+        if let Err(e) = self.produce(topic, &redis_msg).await {
+            tracing::error!("redis queue produce error: {:?}", e);
+            return Err(AppError::CustomError(
+                "redis queue produce error".into(),
+            ));
+        }
+
+        Ok(())
+    }
+
 }

@@ -12,13 +12,13 @@ impl Storage {
     pub async fn create_user(&self, mut active_user: users::ActiveModel) -> AppResult<users::Model> {
         tracing::info!("user model: {:?}", active_user);
 
-        let user_uid: String = active_user
-            .get(users::Column::LamportId)
-            .try_as_ref()
-            .ok_or(AppError::CustomError(
-                "cannot get uid from active user".into(),
-            ))?
-            .to_string();
+        //let user_uid: String = active_user
+        //    .get(users::Column::LamportId)
+        //    .try_as_ref()
+        //    .ok_or(AppError::CustomError(
+        //        "cannot get uid from active user".into(),
+        //    ))?
+        //    .to_string();
 
 
         let user_invite_code: String = active_user

@@ -13,7 +13,7 @@ struct AggregationResult {
 }
 
 impl Storage {
-    pub async fn create_power(
+    pub async fn create_energy(
         &self,
         user_uid: String,
         power_type: &str,

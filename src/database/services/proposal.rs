@@ -1,12 +1,11 @@
 use crate::{
-    common::error::{AppError, AppResult},
+    common::error::{AppResult,AppError},
     database::{
-        entities::{prelude::Proposal, proposal},
+        entities::{prelude::Proposals, proposals},
         Storage,
     },
 };
 use sea_orm::*;
-use serde::Deserialize;
 use uuid::Uuid;
 
 impl Storage {
@@ -16,16 +15,18 @@ impl Storage {
         title: String,
         description: String,
         options: Vec<String>,
+        creator: String,
         group_id: String,
         start_time: chrono::DateTime<chrono::Utc>,
         end_time: chrono::DateTime<chrono::Utc>,
-    ) -> AppResult<proposal::Model> {
-        let model = proposal::ActiveModel {
-            proposer_id: Set(Uuid::new_v4().to_string()),
+    ) -> AppResult<proposals::Model> {
+        let model = proposals::ActiveModel {
+            proposal_id: Set(Uuid::new_v4().to_string()),
             title:Set(title),
             description: Set(description),
             options: Set(options),
-            created_by: Set(group_id), 
+            group_id: Set(group_id),
+            created_by: Set(creator), 
             start_time: Set(start_time.into()),
             end_time: Set(end_time.into()),
             created_at: Set(chrono::Utc::now().into()),
@@ -38,27 +39,66 @@ impl Storage {
         Ok(new_proposal)
     }
 
-    //get proposals list by group_id offset and limit
-    pub async fn get_proposals_list_by_creator(&self, creator: String, offset: i64, limit: i64) -> AppResult<Vec<proposal::Model>> {
-        Ok(Proposal::find()
-            .filter(proposal::Column::CreatedBy.contains(creator))
-            .order_by_asc(proposal::Column::CreatedAt)
+    //get proposals list by creator offset and limit
+    pub async fn get_proposals_list_by_creator(&self, creator: String, offset: i64, limit: i64) -> AppResult<Vec<proposals::Model>> {
+        Ok(Proposals::find()
+            .filter(proposals::Column::CreatedBy.contains(creator))
+            .order_by_asc(proposals::Column::CreatedAt)
             .offset(offset as u64)
             .limit(limit as u64)
             .all(self.conn.as_ref())
             .await?)
     }
 
-    //count proposals by creator
-    pub async fn count_proposals_by_creator(&self, creator: String) -> AppResult<i64> {
-        //Ok(Proposal::find()
-        //    .filter(proposal::Column::CreatedBy.contains(creator))
-        //    .count()
-        //    .one(self.conn.as_ref())
-        //    .await?
-        //    .unwrap_or(0))
-        //
-        Ok(0)
+    //count proposals by group_id
+    pub async fn count_proposals_by_groupid(&self, group_id: &str) -> AppResult<u64> {
+        Ok(Proposals::find()
+            .filter(proposals::Column::CreatedBy.contains(group_id))
+            .count(self.conn.as_ref())
+            .await?)
+    }
+
+    pub async fn get_proposals_list_by_groupid(&self, group_id: &str, offset: i64, limit: i64) -> AppResult<Vec<proposals::Model>> {
+        Ok(Proposals::find()
+            .filter(proposals::Column::GroupId.contains(group_id))
+            .order_by_asc(proposals::Column::CreatedAt)
+            .offset(offset as u64)
+            .limit(limit as u64)
+            .all(self.conn.as_ref())
+            .await?)
+    }
+
+    pub async fn get_proposals_list_with_votes_by_groupid(&self, group_id: &str, offset: i64, limit: i64) -> AppResult<Vec<(proposals::Model, u64)>> {
+        let proposals = Proposals::find()
+            .filter(proposals::Column::GroupId.contains(group_id))
+            .order_by_asc(proposals::Column::CreatedAt)
+            .offset(offset as u64)
+            .limit(limit as u64)
+            .all(self.conn.as_ref())
+            .await?;
+
+        let mut result = Vec::new();
+        for proposal in proposals {
+            //votes
+            let vote_count = self.count_votes_by_proposal_id(&proposal.proposal_id).await?;
+            result.push((proposal, vote_count));
+        }
+
+
+        Ok(result)
+    }
+
+    pub async fn get_proposal_by_proposal_id(&self, proposal_id: &str) -> AppResult<proposals::Model> {
+        match Proposals::find()
+            .filter(proposals::Column::ProposalId.eq(proposal_id))
+            .one(self.conn.as_ref())
+            .await? {
+                Some(proposal) => Ok(proposal),
+                None => Err(AppError::CustomError(format!(
+                            "Proposal {} has not existed",
+                            proposal_id
+                ))),
+            }
     }
 
 }

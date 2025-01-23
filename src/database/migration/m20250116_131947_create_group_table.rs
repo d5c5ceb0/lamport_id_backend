@@ -9,24 +9,24 @@ impl MigrationTrait for Migration {
         manager
             .create_table(
                 Table::create()
-                    .table(Group::Table)
+                    .table(Groups::Table)
                     .if_not_exists()
                     .col(
-                        ColumnDef::new(Group::Id)
+                        ColumnDef::new(Groups::Id)
                             .integer()
                             .not_null()
                             .auto_increment()
                             .primary_key(),
                     )
-                    .col(ColumnDef::new(Group::GroupId).string().unique_key().not_null())
-                    .col(ColumnDef::new(Group::Name).string().not_null())
-                    .col(ColumnDef::new(Group::Logo).string().not_null())
-                    .col(ColumnDef::new(Group::Description).text().null())
-                    .col(ColumnDef::new(Group::Website).string().not_null())
-                    .col(ColumnDef::new(Group::Twitter).string().not_null())
-                    .col(ColumnDef::new(Group::CreatedBy).string().not_null())
-                    .col(ColumnDef::new(Group::CreatedAt).timestamp_with_time_zone().not_null())
-                    .col(ColumnDef::new(Group::UpdatedAt).timestamp_with_time_zone().not_null())
+                    .col(ColumnDef::new(Groups::GroupId).string().unique_key().not_null())
+                    .col(ColumnDef::new(Groups::Name).string().not_null())
+                    .col(ColumnDef::new(Groups::Logo).string().not_null())
+                    .col(ColumnDef::new(Groups::Description).text().null())
+                    .col(ColumnDef::new(Groups::Website).string().not_null())
+                    .col(ColumnDef::new(Groups::Twitter).string().not_null())
+                    .col(ColumnDef::new(Groups::CreatedBy).string().not_null())
+                    .col(ColumnDef::new(Groups::CreatedAt).timestamp_with_time_zone().not_null())
+                    .col(ColumnDef::new(Groups::UpdatedAt).timestamp_with_time_zone().not_null())
                     .to_owned(),
             )
             .await
@@ -34,13 +34,13 @@ impl MigrationTrait for Migration {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .drop_table(Table::drop().table(Group::Table).to_owned())
+            .drop_table(Table::drop().table(Groups::Table).to_owned())
             .await
     }
 }
 
 #[derive(Iden)]
-enum Group {
+enum Groups {
     Table,
     Id,
     GroupId,

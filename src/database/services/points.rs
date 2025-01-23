@@ -57,4 +57,20 @@ impl Storage {
 
         Ok(())
     }
+
+    pub async fn get_user_daily_points(&self, user_uid: &str) -> AppResult<i64> {
+        let today = chrono::Utc::now().date_naive();
+        match Points::find()
+            .filter(points::Column::LamportId.eq(user_uid))
+            .filter(points::Column::CreatedAt.gt(today.and_hms_opt(0, 0, 0)))
+            .select_only()
+            .column_as(points::Column::Amounts.sum(), "total_points")
+            .into_model::<AggregationResult>()
+            .one(self.conn.as_ref())
+            .await?
+        {
+            Some(aggr_result) => Ok(aggr_result.total_points.unwrap_or(0)),
+            None => Ok(0),
+        }
+    }
 }

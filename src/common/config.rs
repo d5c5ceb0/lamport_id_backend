@@ -18,6 +18,7 @@ pub struct DatabaseConfig {
 #[derive(Clone, Debug, Deserialize)]
 pub struct RedisConfig {
     pub redis_url: String,
+    pub topic: String
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -27,10 +28,17 @@ pub struct AuthConfig {
     pub redirect_url: String,
 }
 
+#[derive(Clone, Debug, Deserialize)]
+pub struct NostrConfig {
+    pub priv_key: String,
+    pub ws_url: String,
+}
+
 #[derive(Clone, Debug, Deserialize, LoadConfig)]
 pub struct Config {
     pub server: ServerConfig,
     pub database: DatabaseConfig,
     pub auth: AuthConfig,
     pub redis: RedisConfig,
+    pub nostr: NostrConfig,
 }

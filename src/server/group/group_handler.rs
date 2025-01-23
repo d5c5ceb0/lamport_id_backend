@@ -1,9 +1,6 @@
 use super::group_message::*;
 use crate::{app::SharedState, common::error::AppResult, server::middlewares::AuthToken};
 use axum::{debug_handler, extract::Json as EJson, extract::State, extract::Query, Json};
-use serde::Deserialize;
-use crate::database::entities::group;
-use serde::Serialize;
 use std::convert::Into;
 
 
@@ -43,6 +40,37 @@ pub async fn get_group_list(
         "result": {
             "count": groups.len(),
             "groups":groups.into_iter().map(GroupInfo::from).collect::<Vec<GroupInfo>>()
+        }
+    })))
+}
+
+#[debug_handler]
+pub async fn get_group_info(
+    State(state): State<SharedState>,
+) -> AppResult<Json<serde_json::Value>> {
+    let group = state.store.get_default_group().await?;
+    let group_info = GroupInfo::from(group.clone());
+
+    let proposals = state.store.count_proposals_by_groupid(group.group_id.as_str()).await?;
+
+    let votes = state.store.count_votes_by_group_id(group.group_id.as_str()).await?;
+
+    let members = state.store.count_voters_by_group_id(group.group_id.as_str()).await?;
+
+    Ok(Json(serde_json::json!({
+        "result": {
+            "info": group_info,
+            "stats": {
+                "ai_score": 5,
+                "ai_rating": 211,
+                "particaipation_proposals": 105,
+                "recommended_proposals": 105,
+                "activity_contribution": 250,
+                "daily_average_msg": 50,
+                "members": members,
+                "proposals": proposals,
+                "votes": votes,
+            }
         }
     })))
 }

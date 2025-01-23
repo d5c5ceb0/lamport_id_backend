@@ -55,6 +55,18 @@ pub enum AppError {
 
     #[error("{0}")]
     RequestError(String),
+
+    #[error(transparent)]
+    NostrSdkKeyError(#[from] nostr_sdk::key::Error),
+
+    #[error(transparent)]
+    NostrSdkClientError(#[from] nostr_sdk::client::Error),
+
+    #[error(transparent)]
+    NostrSdkDBError(#[from] nostr_sdk::prelude::DatabaseError),
+
+    #[error("Nostr SDK error: {0}")]
+    NostrSdkError(#[from] nostr_sdk::event::unsigned::Error),
 }
 
 impl IntoResponse for AppError {
@@ -73,6 +85,10 @@ impl IntoResponse for AppError {
             Self::UserExisted(_) => StatusCode::UNPROCESSABLE_ENTITY,
             Self::UserUnExisted(_) => StatusCode::UNPROCESSABLE_ENTITY,
             Self::RequestError(_) => StatusCode::SERVICE_UNAVAILABLE,
+            Self::NostrSdkKeyError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            Self::NostrSdkClientError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            Self::NostrSdkDBError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            Self::NostrSdkError(_) => StatusCode::INTERNAL_SERVER_ERROR,
         };
 
         (status, Json(serde_json::json!({"error":self.to_string()}))).into_response()

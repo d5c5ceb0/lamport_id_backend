@@ -31,7 +31,7 @@ pub async fn get_user_count(
 }
 
 #[debug_handler]
-pub async fn get_user_invites(
+pub async fn get_user_stats(
     State(state): State<SharedState>,
     AuthToken(user): AuthToken,
 ) -> AppResult<Json<serde_json::Value>> {
@@ -54,7 +54,13 @@ pub async fn get_user_invites(
         Err(e) => return Err(e),
     };
 
+    //pub async fn get_user_daily_points(&self, user_uid: &str) -> AppResult<i64> {
+    let daily_point = match state.store.get_user_daily_points(claim.sub.as_ref()).await {
+        Ok(v) => v as u64,
+        Err(e) => return Err(e),
+    };
+
     Ok(Json(serde_json::json!({
-    "result": PointsResponse{point, invite_count, energy}
+    "result": PointsResponse{point, invite_count, energy, daily_point}
     })))
 }

@@ -1,11 +1,10 @@
 use crate::{
     common::error::{AppError, AppResult},
     database::{
-        entities::{prelude::LamportId, lamport_id},
+        entities::prelude::LamportId,
         Storage,
     },
 };
-use sea_orm::prelude::Expr;
 use sea_orm::*;
 
 

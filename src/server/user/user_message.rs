@@ -7,9 +7,10 @@ use std::convert::Into;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct PointsResponse {
-    pub point: u64,
     pub invite_count: u64,
+    pub point: u64,
     pub energy: u64,
+    pub daily_point: u64
 }
 
 #[derive(Serialize, Deserialize, Debug)]

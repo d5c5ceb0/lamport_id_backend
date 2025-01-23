@@ -2,18 +2,16 @@ use super::auth_message::*;
 use super::auth_service::*;
 use crate::{
     app::SharedState,
-    common::{
-        consts,
-        error::{AppError, AppResult},
-    },
+    common::error::{AppError, AppResult},
     server::user::*,
+    common::consts,
 };
 use axum::{
     debug_handler,
     extract::{Query, State},
     Json,
 };
-use oauth2::{reqwest::async_http_client, AuthorizationCode, RedirectUrl, TokenResponse};
+//use oauth2::RedirectUrl;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
@@ -35,11 +33,11 @@ pub async fn auth_token(
 
     params.validate_items()?;
 
-    let client = state
-        .oauth
-        .clone()
-        .set_redirect_uri(RedirectUrl::new(params.clone().redirect_uri.unwrap().clone())?);
-        //.set_redirect_uri(RedirectUrl::new(state.config.auth.redirect_url.clone())?);
+    //let client = state
+    //    .oauth
+    //    .clone()
+    //    .set_redirect_uri(RedirectUrl::new(params.clone().redirect_uri.unwrap().clone())?);
+    //    //.set_redirect_uri(RedirectUrl::new(state.config.auth.redirect_url.clone())?);
 
     let csrf_state = params.clone()
         .state
@@ -57,18 +55,10 @@ pub async fn auth_token(
 
     let client = Client::new();
 
-    //let token_params = [
-    //    ("code", params.code.unwrap()),
-    //    ("grant_type", "authorization_code".into()),
-    //    ("client_id", "Q1oxNk1mWUVwZTF6Zm91U3NudUY6MTpjaQ".into()),
-    //    ("redirect_uri", "http://127.0.0.1:8080/api/v1/auth/callback".into()),
-    //    ("code_verifier", "challenge".into()),
-    //];
-
     let token_params = [
         ("code", params.clone().code.unwrap()),
         ("grant_type", "authorization_code".into()),
-        ("client_id", "Q1oxNk1mWUVwZTF6Zm91U3NudUY6MTpjaQ".into()),
+        ("client_id", state.config.auth.client_id.clone()),
         ("redirect_uri", params.clone().redirect_uri.unwrap()),
         ("code_verifier", "challenge".into()),
     ];
@@ -164,7 +154,7 @@ pub async fn auth_token(
 
         state
             .store
-            .create_power(created_user.clone().lamport_id, "register", 21000000)
+            .create_energy(created_user.clone().lamport_id, consts::ENERGY_REGISTER, consts::ENERGY_REGISTER_VALUE)
             .await?;
 
         if let Some(invited_by)  = created_user.invited_by.as_deref() {
@@ -173,13 +163,13 @@ pub async fn auth_token(
             //award point
             state
                 .store
-                .award_points(inviter.lamport_id.clone(), "invite", 100, "invite reward")
+                .award_points(inviter.lamport_id.clone(), consts::POINTS_INVITE, consts::POINTS_INVITE_VALUE, "invite reward")
                 .await?;
 
-            //consume power
+            //consume energy 
             state
                 .store
-                .create_power(inviter.lamport_id, "invite", -1)
+                .create_energy(inviter.lamport_id, consts::ENERGY_INVITE, consts::ENERGY_INVITE_VALUE)
                 .await?;
 
         }
