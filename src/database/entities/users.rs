@@ -9,14 +9,15 @@ pub struct Model {
     pub id: i32,
     #[sea_orm(unique)]
     pub lamport_id: String,
-    #[sea_orm(unique)]
     pub x_id: String,
     #[sea_orm(unique)]
-    pub address: Option<String>,
+    pub address: String,
     pub name: String,
-    #[sea_orm(unique)]
     pub user_name: String,
     pub image: String,
+    pub email: String,
+    pub verified: bool,
+    pub verified_by: Option<String>,
     #[sea_orm(unique)]
     pub invite_code: String,
     pub invited_by: Option<String>,

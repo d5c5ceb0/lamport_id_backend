@@ -19,11 +19,14 @@ impl MigrationTrait for Migration {
                             .primary_key(),
                     )
                     .col(ColumnDef::new(Users::LamportId).string().not_null().unique_key())
-                    .col(ColumnDef::new(Users::XId).string().not_null().unique_key())
-                    .col(ColumnDef::new(Users::Address).string().unique_key().null())
+                    .col(ColumnDef::new(Users::XId).string().not_null())
+                    .col(ColumnDef::new(Users::Address).string().unique_key().not_null())
                     .col(ColumnDef::new(Users::Name).string().not_null())
-                    .col(ColumnDef::new(Users::UserName).string().unique_key().not_null())
+                    .col(ColumnDef::new(Users::UserName).string().not_null())
                     .col(ColumnDef::new(Users::Image).string().not_null())
+                    .col(ColumnDef::new(Users::Email).string().not_null())
+                    .col(ColumnDef::new(Users::Verified).boolean().not_null())
+                    .col(ColumnDef::new(Users::VerifiedBy).string().null())
                     .col(
                         ColumnDef::new(Users::InviteCode)
                             .string()
@@ -63,6 +66,9 @@ pub enum Users {
     Address,
     XId,
     Image,
+    Email,
+    Verified,
+    VerifiedBy,
     InvitedBy,
     InviteCode,
     CreatedAt,

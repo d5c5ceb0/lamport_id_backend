@@ -67,6 +67,9 @@ pub enum AppError {
 
     #[error("Nostr SDK error: {0}")]
     NostrSdkError(#[from] nostr_sdk::event::unsigned::Error),
+
+    #[error("{0}")]
+    ConflictError(String),
 }
 
 impl IntoResponse for AppError {
@@ -89,6 +92,7 @@ impl IntoResponse for AppError {
             Self::NostrSdkClientError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Self::NostrSdkDBError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Self::NostrSdkError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            Self::ConflictError(_) => StatusCode::CONFLICT,
         };
 
         (status, Json(serde_json::json!({"error":self.to_string()}))).into_response()

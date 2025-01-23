@@ -178,4 +178,47 @@ impl Storage {
         Ok(Users::find().count(self.conn.as_ref()).await?)
     }
 
+    //get user by address
+    pub async fn get_user_by_address(&self, address: &str) -> AppResult<users::Model> {
+        match Users::find()
+            .filter(users::Column::Address.eq(address))
+            .one(self.conn.as_ref())
+            .await? 
+        {
+            Some(user) => Ok(user),
+            None => Err(AppError::UserUnExisted(format!(
+                "User {} has not existed",
+                address
+            ))),
+        }
+    }
+
+    //update user's verifyed
+    pub async fn update_user(&self, address: &str, verifier: &str) -> AppResult<users::Model> {
+        if let Some(mut user) = Users::find()
+            .filter(users::Column::Address.eq(address))
+                .one(self.conn.as_ref())
+                .await?
+                .map(|u| u.into_active_model()) {
+                    user.verified = Set(true);
+                    user.verified_by = Set(Some(verifier.to_string()));
+                    Ok(user.update(self.conn.as_ref()).await?)
+        } else {
+            Err(AppError::UserUnExisted(format!(
+                "User {} has not existed",
+                address
+            )))
+        }
+
+    }
+
+    pub async fn is_user_exists_by_address(&self, address: &str) -> AppResult<bool> {
+        let user = Users::find()
+            .filter(users::Column::Address.eq(address))
+            .one(self.conn.as_ref())
+            .await?;
+
+        Ok(user.is_some())
+    }
+
 }

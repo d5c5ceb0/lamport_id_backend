@@ -1,6 +1,12 @@
 use crate::database::entities::vote;
 use sea_orm::*;
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct CreateVoteRequest {
+    pub data: VoteInfo,
+    pub sig: String,
+}
+
 //create VoteInfo struct
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct VoteInfo {

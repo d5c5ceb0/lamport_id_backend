@@ -6,8 +6,9 @@ use axum::{debug_handler, extract::{self,State, Query,Path}, Json};
 pub async fn create_proposal(
     State(state): State<SharedState>,
     AuthToken(user): AuthToken,
-    extract::Json(payload): extract::Json<CreateProposalRequest>,
+    extract::Json(CreateProposalRequest{data: payload, sig}): extract::Json<CreateProposalRequest>,
 ) -> AppResult<Json<serde_json::Value>> {
+    //TODO check sig
 
     let client = state.jwt_handler.clone();
     let claim = client.decode_token(user).unwrap();

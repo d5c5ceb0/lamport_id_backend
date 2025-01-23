@@ -2,8 +2,14 @@ use serde::{Deserialize, Serialize};
 use crate::{database::entities::proposals,server::proposal::proposal_service::get_proposal_status};
 
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct CreateProposalRequest {
+    pub data: ProposalData,
+    pub sig: String,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct ProposalData {
     pub title: String,
     pub description: String,
     pub options: Vec<String>,  //check For, Against, Abstain

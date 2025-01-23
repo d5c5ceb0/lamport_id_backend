@@ -22,10 +22,12 @@ pub struct CountResponse {
 pub struct User {
     pub lamport_id: String,
     pub name: String,
-    pub address: Option<String>,
+    pub address: String,
     pub x_id: String,
     pub username: String,
     pub image: String,
+    pub email: String,
+    pub verified: bool,
     pub invited_by: Option<String>,
     pub invite_code: String,
 }
@@ -35,10 +37,12 @@ impl From<OauthUserInfo> for User {
         Self {
             lamport_id: user_service::gen_lamport_id(),
             name: item.data.name,
-            address: None,
+            address: user_service::gen_address(),  //TODO mock
             x_id: item.data.id,
             username: item.data.username,
             image: item.data.profile_image_url,
+            email: "".to_string(),
+            verified: false,
             invited_by: None,
             invite_code: user_service::gen_invite_code(8),
         }
@@ -62,6 +66,9 @@ impl Into<users::ActiveModel> for User {
             x_id: Set(self.x_id),
             user_name: Set(self.username),
             image: Set(self.image),
+            email: Set(self.email),
+            verified: Set(self.verified),
+            verified_by: Set(None),
             invited_by: Set(self.invited_by),
             invite_code: Set(self.invite_code),
             created_at: Set(Some(chrono::Utc::now().into())),
@@ -77,6 +84,9 @@ pub struct UserResponse {
     pub invite_code: String,
     pub invited_by: Option<String>,
     pub image: String,
+    pub verified: bool,
+    pub email: String,
+    pub address: String,
 }
 
 impl From<users::Model> for UserResponse {
@@ -87,6 +97,9 @@ impl From<users::Model> for UserResponse {
             invite_code: user.invite_code,
             invited_by: user.invited_by,
             image: user.image,
+            verified: user.verified,
+            email: user.email,
+            address: user.address,
         }
     }
 }

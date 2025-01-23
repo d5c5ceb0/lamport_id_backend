@@ -8,7 +8,7 @@ use crate::{
 };
 use axum::{
     debug_handler,
-    extract::{Query, State},
+    extract::{Query, State, Path},
     Json,
 };
 //use oauth2::RedirectUrl;
@@ -133,6 +133,7 @@ pub async fn auth_token(
             .await?
     } else {
         let user: User = User::from(user_info.clone());
+        tracing::info!("[auth_token] create user: {:?}", user);
 
         //points
         let user = match params.invited_by {
@@ -229,3 +230,20 @@ pub async fn get_csrf_token(
         }
     })))
 }
+
+#[debug_handler]
+pub async fn get_nonce(
+    State(state): State<SharedState>,
+    Path(address): Path<String>,
+) -> AppResult<Json<serde_json::Value>> {
+    let redis_client = RedisClient::from(state.redis.clone());
+    let token = redis_client.cache_csrf_token().await.unwrap();
+    tracing::info!("gen nonce: {}-{:?}", address, token);
+
+    Ok(Json(serde_json::json!({
+        "result": {
+            "nonce": token
+        }
+    })))
+}
+

@@ -13,8 +13,12 @@ use axum::{debug_handler, extract::Path, extract::State, extract::Query, extract
 pub async fn create_vote(
     State(state): State<SharedState>,
     AuthToken(user): AuthToken,
-    EJson(mut vote_info): EJson<VoteInfo>,
+    EJson(CreateVoteRequest{data,sig}): EJson<CreateVoteRequest>,
 ) -> AppResult<Json<serde_json::Value>> {
+    //TODO checksig
+
+    let mut vote_info = data.clone();
+
     let client = state.jwt_handler.clone();
     let claim = client.decode_token(user).unwrap();
 

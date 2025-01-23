@@ -1,4 +1,4 @@
-use super::{auth::auth_router, health::health_router, user::user_router, webset::index_router, group::group_router, proposal::proposal_router, vote::vote_router};
+use super::{auth::auth_router, health::health_router, user::user_router, webset::index_router, group::group_router, proposal::proposal_router, vote::vote_router, users::users_router};
 use crate::{app::SharedState, server::middlewares};
 use axum::{error_handling::HandleErrorLayer, http::Method, Router};
 use std::time::Duration;
@@ -10,6 +10,7 @@ use tower_http::{
 
 pub fn app_router(state: SharedState) -> Router {
     let user_router = user_router(state.clone());
+    let users_router = users_router(state.clone());
     let auth_router = auth_router(state.clone());
     let index_router = index_router();
     let health_router = health_router();
@@ -22,6 +23,7 @@ pub fn app_router(state: SharedState) -> Router {
         .nest("/api/v1/health", health_router)
         .nest("/api/v1/auth", auth_router)
         .nest("/api/v1/user", user_router)
+        .nest("/api/v1/users", users_router)
         .nest("/api/v1/group", group_router)
         .nest("/api/v1/proposal", proposal_router)
         .nest("/api/v1/vote", vote_router)

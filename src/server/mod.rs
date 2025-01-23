@@ -9,5 +9,6 @@ mod webset;
 mod group;
 pub mod proposal;
 mod vote;
+mod users;
 
 pub use server::http_server_start;

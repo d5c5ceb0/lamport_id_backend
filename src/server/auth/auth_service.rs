@@ -31,6 +31,15 @@ impl RedisClient {
         Ok(token)
     }
 
+    pub async fn cache_nonce(&self, address: &str) -> Result<String, redis::RedisError> {
+        let token: String = gen_csrf_token();
+
+        let mut conn = self.0.get_multiplexed_async_connection().await?;
+        let _: () = conn.set_ex(address, token.as_str(), 600).await?;
+
+        Ok(token)
+    }
+
     pub async fn get_csrf_token(&self, token: &str) -> Result<String, redis::RedisError> {
         let mut conn = self.0.get_multiplexed_async_connection().await?;
         let cached_token: Option<String> = conn.get(token).await?;
