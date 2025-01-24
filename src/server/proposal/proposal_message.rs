@@ -16,6 +16,8 @@ pub struct ProposalData {
     pub group_id: String,
     //pub start_time: chrono::DateTime<chrono::Utc>,
     pub end_time: chrono::DateTime<chrono::Utc>,
+    //pub address: String,
+    //pub nonce: String,
 }
 
 // ProposalInfo struct

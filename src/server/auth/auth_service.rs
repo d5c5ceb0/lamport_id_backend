@@ -30,16 +30,6 @@ impl RedisClient {
 
         Ok(token)
     }
-
-    pub async fn cache_nonce(&self, address: &str) -> Result<String, redis::RedisError> {
-        let token: String = gen_csrf_token();
-
-        let mut conn = self.0.get_multiplexed_async_connection().await?;
-        let _: () = conn.set_ex(address, token.as_str(), 600).await?;
-
-        Ok(token)
-    }
-
     pub async fn get_csrf_token(&self, token: &str) -> Result<String, redis::RedisError> {
         let mut conn = self.0.get_multiplexed_async_connection().await?;
         let cached_token: Option<String> = conn.get(token).await?;
@@ -55,8 +45,38 @@ impl RedisClient {
 
     pub async fn del_csrf_token(&self, token: &str) -> Result<(), redis::RedisError> {
         let mut conn = self.0.get_multiplexed_async_connection().await?;
-        let _: () = conn.del(&token).await?;
+        let _: () = conn.del(token).await?;
 
         Ok(())
     }
+
+    pub async fn cache_nonce(&self, address: &str) -> Result<String, redis::RedisError> {
+        let token: String = gen_csrf_token();
+
+        let mut conn = self.0.get_multiplexed_async_connection().await?;
+        let _: () = conn.set_ex(address, token.as_str(), 600).await?;
+
+        Ok(token)
+    }
+
+    pub async fn get_nonce(&self, address: &str) -> Result<String, redis::RedisError> {
+        let mut conn = self.0.get_multiplexed_async_connection().await?;
+        let cached_token: Option<String> = conn.get(address).await?;
+
+        match cached_token {
+            Some(val) => Ok(val),
+            None => Err(redis::RedisError::from((
+                redis::ErrorKind::ResponseError,
+                "Token not found",
+            ))),
+        }
+    }
+
+    pub async fn del_nonce(&self, address: &str) -> Result<(), redis::RedisError> {
+        let mut conn = self.0.get_multiplexed_async_connection().await?;
+        let _: () = conn.del(address).await?;
+
+        Ok(())
+    }
+
 }

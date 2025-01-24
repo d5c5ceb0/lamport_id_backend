@@ -4,6 +4,7 @@ use crate::{
     common::error::{AppResult, AppError}, 
     server::{middlewares::AuthToken, proposal::proposal_service::get_proposal_status}, 
     common::consts,
+    helpers::eip191::verify_signature,
 };
 use axum::{debug_handler, extract::Path, extract::State, extract::Query, extract::Json as EJson, Json};
 
@@ -15,12 +16,20 @@ pub async fn create_vote(
     AuthToken(user): AuthToken,
     EJson(CreateVoteRequest{data,sig}): EJson<CreateVoteRequest>,
 ) -> AppResult<Json<serde_json::Value>> {
-    //TODO checksig
+    let client = state.jwt_handler.clone();
+    let claim = client.decode_token(user).unwrap();  //TODO address in jwt
+
+    if cfg!(not(debug_assertions)) {
+        //get user address by lamport id
+        let user = state.store.get_user_by_uid(claim.sub.as_str()).await?;
+
+        let verified= verify_signature(&data, &sig, &user.address)?;
+        if !verified {
+            return Err(AppError::InvalidSignature);
+        }
+    }
 
     let mut vote_info = data.clone();
-
-    let client = state.jwt_handler.clone();
-    let claim = client.decode_token(user).unwrap();
 
     //check energy
     let energy = state.store.get_user_power(claim.sub.as_str()).await?;
@@ -78,7 +87,6 @@ pub async fn get_votes_by_proposal_id(
     let offset = params.offset;
     let limit = params.limit;
 
-    //TODO page list
     let votes = state.store.get_votes_by_proposal_id(proposal_id.as_str(), offset, limit).await?;
 
     Ok(Json(serde_json::json!({
@@ -123,5 +131,21 @@ pub async fn count_votes_by_proposal_id_and_choice(
         "result": {
             "count": count
         }
+    })))
+}
+
+//get vote info of voter_id and proposal_id
+#[debug_handler]
+pub async fn get_proposal_vote_by_voter_id(
+    State(state): State<SharedState>,
+    AuthToken(user): AuthToken,
+    Path(proposal_id): Path<String>,
+) -> AppResult<Json<serde_json::Value>> {
+    let client = state.jwt_handler.clone();
+    let claim = client.decode_token(user).unwrap();
+    
+    let vote = state.store.get_proposal_vote_by_voter_id(claim.sub.as_str(), proposal_id.as_str()).await?;
+    Ok(Json(serde_json::json!({
+        "result": VoteInfo::from(vote)
     })))
 }

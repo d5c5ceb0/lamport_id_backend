@@ -1,2 +1,2 @@
 pub mod google_auth;
-pub mod erc712;
+pub mod eip191;

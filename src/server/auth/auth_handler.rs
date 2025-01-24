@@ -237,7 +237,7 @@ pub async fn get_nonce(
     Path(address): Path<String>,
 ) -> AppResult<Json<serde_json::Value>> {
     let redis_client = RedisClient::from(state.redis.clone());
-    let token = redis_client.cache_csrf_token().await.unwrap();
+    let token = redis_client.cache_nonce(address.as_str()).await.unwrap();
     tracing::info!("gen nonce: {}-{:?}", address, token);
 
     Ok(Json(serde_json::json!({

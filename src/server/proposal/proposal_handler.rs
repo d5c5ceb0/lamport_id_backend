@@ -1,5 +1,11 @@
 use super::proposal_message::*;
-use crate::{app::SharedState, common::error::{AppResult,AppError}, server::middlewares::AuthToken, common::consts};
+use crate::{
+    app::SharedState, 
+    common::error::{AppResult,AppError},
+    server::middlewares::AuthToken,
+    common::consts,
+    helpers::eip191::verify_signature,
+};
 use axum::{debug_handler, extract::{self,State, Query,Path}, Json};
 
 #[debug_handler]
@@ -8,10 +14,19 @@ pub async fn create_proposal(
     AuthToken(user): AuthToken,
     extract::Json(CreateProposalRequest{data: payload, sig}): extract::Json<CreateProposalRequest>,
 ) -> AppResult<Json<serde_json::Value>> {
-    //TODO check sig
-
     let client = state.jwt_handler.clone();
-    let claim = client.decode_token(user).unwrap();
+    let claim = client.decode_token(user).unwrap();  //TODO address in jwt
+
+    if cfg!(not(debug_assertions)) {
+        //get user address by lamport id
+        let user = state.store.get_user_by_uid(claim.sub.as_str()).await?;
+
+        let verified= verify_signature(&payload, &sig, &user.address)?;
+        if !verified {
+            return Err(AppError::InvalidSignature);
+        }
+    }
+
     let group_id = payload.group_id.clone();
     let title = payload.title;
     let description = payload.description;

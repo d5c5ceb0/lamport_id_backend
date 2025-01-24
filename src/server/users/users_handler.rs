@@ -1,15 +1,17 @@
-//use super::users_message::*;
+use super::users_message::*;
 use crate::{
     app::SharedState, 
     common::{error::{AppResult, AppError}, consts}, 
-    server::{middlewares::AuthToken, user::{UserResponse,User, user_service}}
+    server::{middlewares::AuthToken, user::{UserResponse, User}, auth::auth_service::*},
+    helpers::eip191::verify_signature,
+
+
 };
 use axum::{
     debug_handler,
     extract::{State, Path, Json as EJson},
     Json, 
 };
-use serde::{Deserialize, Serialize};
 
 
 //check username
@@ -35,48 +37,42 @@ pub async fn check_username(
 }
 
 
-//request
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RegisterRequest {
-    pub data: UserInfo,
-    pub invited_by: Option<String>,
-    pub sig: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UserInfo {
-    pub user_name: String,
-    pub email: String,
-    pub image: String,
-    pub address: String,
-    pub nonce: String,
-}
-
-impl From<RegisterRequest> for User {
-    fn from(item: RegisterRequest) -> Self {
-        Self {
-            lamport_id: user_service::gen_lamport_id(),
-            name: item.data.user_name.clone(),
-            address: item.data.address,
-            x_id: "".to_string(),
-            username: item.data.user_name,
-            image: item.data.image,
-            email: item.data.email,
-            verified: false,
-            invited_by: None,
-            invite_code: user_service::gen_invite_code(8),
-        }
-    }
-}
-
-
 // register
 #[debug_handler]
 pub async fn register(
     State(state): State<SharedState>,
     EJson(req): EJson<RegisterRequest>,
 ) -> AppResult<Json<serde_json::Value>> {
-    //TODO veirfy sig, nonce ? as middleware??
+    if cfg!(not(debug_assertions)) {
+        let verified= verify_signature(&req.data, &req.sig, &req.data.address)?;
+        if !verified {
+            return Err(AppError::InvalidSignature);
+        }
+
+        let redis_client = RedisClient::from(state.redis.clone());
+
+        if let Ok(nonce) = redis_client.get_nonce(req.data.address.as_str()).await {
+            tracing::info!("got nonce: {:?} by key: {:?}", nonce, req.data.address);
+            if nonce != req.data.nonce {
+                return Err(AppError::InputValidateError("nonce verification error".into()));
+            }
+        } else {
+            tracing::error!("got nonce err: wrong address:{:?} ", req.data.address);
+            return Err(AppError::InputValidateError(
+                    "nonce is not existing".into(),
+            ));
+        }
+
+        match redis_client.del_nonce(req.data.address.as_str()).await {
+            Ok(_) => {
+                tracing::info!("delete nonce success");
+            }
+            Err(e) => {
+                tracing::error!("delete nonce err: {:?}", e);
+            }
+        }
+    }
+
 
     let user_info: RegisterRequest = req.clone();
 
@@ -161,7 +157,11 @@ pub async fn verify_user(
     let client = state.jwt_handler.clone();
     let claim = client.decode_token(user).unwrap();
     
-    //TODO  verifier must be verifyed, 
+    //get user by uid
+    let verifier = state.store.get_user_by_uid(claim.sub.as_str()).await?;
+    if !verifier.verified {
+        return Err(AppError::InputValidateError("verifier is not verified".into()));
+    }
 
     let _user = state.store.update_user(address.as_str(), claim.sub.as_str()).await?;
 
@@ -173,26 +173,41 @@ pub async fn verify_user(
     })))
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LoginRequest {
-    pub data: LoginData,
-    pub sig: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LoginData {
-    pub content: String,
-    pub address: String,
-    pub nonce: String,
-}
-
 //login
 #[debug_handler]
 pub async fn login(
     State(state): State<SharedState>,
     EJson(req): EJson<LoginRequest>,
 ) -> AppResult<Json<serde_json::Value>> {
-    //TODO verify signature and address
+    if cfg!(not(debug_assertions)) {
+        let verified= verify_signature(&req.data, &req.sig, &req.data.address)?;
+        if !verified {
+            return Err(AppError::InvalidSignature);
+        }
+
+        let redis_client = RedisClient::from(state.redis.clone());
+
+        if let Ok(nonce) = redis_client.get_nonce(req.data.address.as_str()).await {
+            tracing::info!("got nonce: {:?} by key: {:?}", nonce, req.data.address);
+            if nonce != req.data.nonce {
+                return Err(AppError::InputValidateError("nonce verification error".into()));
+            }
+        } else {
+            tracing::error!("got nonce err: wrong address:{:?} ", req.data.address);
+            return Err(AppError::InputValidateError(
+                    "nonce is not existing".into(),
+            ));
+        }
+
+        match redis_client.del_nonce(req.data.address.as_str()).await {
+            Ok(_) => {
+                tracing::info!("delete nonce success");
+            }
+            Err(e) => {
+                tracing::error!("delete nonce err: {:?}", e);
+            }
+        }
+    }
 
     let user = state.store.get_user_by_address(&req.data.address).await?;
     let secret = state.jwt_handler.clone();

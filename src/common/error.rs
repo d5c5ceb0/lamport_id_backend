@@ -70,6 +70,9 @@ pub enum AppError {
 
     #[error("{0}")]
     ConflictError(String),
+
+    #[error("invalid signature")]
+    InvalidSignature
 }
 
 impl IntoResponse for AppError {
@@ -93,6 +96,7 @@ impl IntoResponse for AppError {
             Self::NostrSdkDBError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Self::NostrSdkError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Self::ConflictError(_) => StatusCode::CONFLICT,
+            Self::InvalidSignature => StatusCode::UNPROCESSABLE_ENTITY,
         };
 
         (status, Json(serde_json::json!({"error":self.to_string()}))).into_response()

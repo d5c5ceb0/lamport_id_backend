@@ -40,6 +40,7 @@ nostr = { version = "0.38.0", features = ["all-nips"] }
 nostr-sdk = { version = "0.38.0", features = ["all-nips"] }
 sqlx = { version = "0.8.3", features = ["postgres"] }
 futures = "0.3.31"
+hex = "0.4.3"
 
 [workspace]
 members = [
