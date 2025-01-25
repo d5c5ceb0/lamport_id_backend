@@ -52,7 +52,7 @@ impl Storage {
     pub async fn count_votes_by_group_id(&self, group_id: &str) -> AppResult<i64> {
         let count = self.conn.query_one(Statement::from_string(
                         self.conn.get_database_backend(),
-                        format!("SELECT COUNT(v.id) FROM vote v INNER JOIN proposals p ON v.proposal_id = p.proposal_id WHERE p.created_by = \'{}\';", group_id),
+                        format!("SELECT COUNT(v.id) FROM vote v INNER JOIN proposals p ON v.proposal_id = p.proposal_id WHERE p.group_id = \'{}\';", group_id),
         )).await?.unwrap().try_get_by::<i64, _>(0).unwrap();
 
 
@@ -62,7 +62,7 @@ impl Storage {
     pub async fn count_voters_by_group_id(&self, group_id: &str) -> AppResult<i64> {
         let count = self.conn.query_one(Statement::from_string(
                         self.conn.get_database_backend(),
-                        format!("SELECT COUNT(DISTINCT v.voter_id) FROM vote v INNER JOIN proposals p ON v.proposal_id = p.proposal_id WHERE p.created_by = \'{}\';", group_id),
+                        format!("SELECT COUNT(DISTINCT v.voter_id) FROM vote v INNER JOIN proposals p ON v.proposal_id = p.proposal_id WHERE p.group_id = \'{}\';", group_id),
         )).await?.unwrap().try_get_by::<i64, _>(0).unwrap();
 
         Ok(count)

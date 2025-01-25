@@ -12,15 +12,6 @@ impl Storage {
     pub async fn create_user(&self, mut active_user: users::ActiveModel) -> AppResult<users::Model> {
         tracing::info!("user model: {:?}", active_user);
 
-        //let user_uid: String = active_user
-        //    .get(users::Column::LamportId)
-        //    .try_as_ref()
-        //    .ok_or(AppError::CustomError(
-        //        "cannot get uid from active user".into(),
-        //    ))?
-        //    .to_string();
-
-
         let user_invite_code: String = active_user
             .get(users::Column::InviteCode)
             .try_as_ref()
@@ -31,18 +22,14 @@ impl Storage {
 
         let user_uid =  self.get_current_lamport_id().await.unwrap().to_string();
 
-        //let user: users::Model = active_user.clone().try_into_model()?;
-        match self
+        if self
             .is_user_exists(&user_uid, &user_invite_code)
-            .await?
+                .await?
         {
-            true => {
-                return Err(AppError::UserExisted(format!(
-                    "User: {} already exists",
-                    user_uid
-                )))
-            }
-            false => (),
+            return Err(AppError::UserExisted(format!(
+                        "User: {} already exists",
+                        user_uid
+            )))
         }
 
         active_user.lamport_id = Set(user_uid.clone());

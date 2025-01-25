@@ -14,8 +14,9 @@ pub struct ProposalData {
     pub description: String,
     pub options: Vec<String>,  //check For, Against, Abstain
     pub group_id: String,
+    pub end_time: String,
     //pub start_time: chrono::DateTime<chrono::Utc>,
-    pub end_time: chrono::DateTime<chrono::Utc>,
+    //pub end_time: chrono::DateTime<chrono::Utc>,
     //pub address: String,
     //pub nonce: String,
 }
@@ -37,9 +38,9 @@ pub struct ProposalInfo {
     pub ai_stats_weight: String,
     pub earn: u64,
     pub contribution: u64,
-    //pub start_time: chrono::DateTime<chrono::Utc>,
-    //pub end_time: chrono::DateTime<chrono::Utc>,
-    //pub created_at: chrono::DateTime<chrono::Utc>,
+    pub start_time: chrono::DateTime<chrono::Utc>,
+    pub end_time: chrono::DateTime<chrono::Utc>,
+    pub created_at: chrono::DateTime<chrono::Utc>,
     //pub updated_at: chrono::DateTime<chrono::Utc>,
 }
 
@@ -61,9 +62,9 @@ impl From<proposals::Model> for ProposalInfo {
             ai_stats_weight: "0.3".to_string(),
             earn: 0,
             contribution: 0,
-            //start_time: proposal.start_time.into(),
-            //end_time: proposal.end_time.into(),
-            //created_at: proposal.created_at.into(),
+            start_time: proposal.start_time.into(),
+            end_time: proposal.end_time.into(),
+            created_at: proposal.created_at.into(),
             //updated_at: proposal.updated_at.into(),
         }
     }
@@ -72,6 +73,8 @@ impl From<proposals::Model> for ProposalInfo {
 
 #[derive(Deserialize, Serialize)]
 pub struct GetProposalsRequest {
+    pub order: Option<String>,
+    pub status: Option<String>,
     pub offset: i64,
     pub limit: i64,
 }

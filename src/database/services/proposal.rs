@@ -53,7 +53,7 @@ impl Storage {
     //count proposals by group_id
     pub async fn count_proposals_by_groupid(&self, group_id: &str) -> AppResult<u64> {
         Ok(Proposals::find()
-            .filter(proposals::Column::CreatedBy.contains(group_id))
+            .filter(proposals::Column::GroupId.contains(group_id))
             .count(self.conn.as_ref())
             .await?)
     }
@@ -87,6 +87,47 @@ impl Storage {
 
         Ok(result)
     }
+
+    //get_proposals_list_with_votes_by_groupid with order asc/desc, status: Passed or active or all
+    pub async fn get_proposals_list_with_votes_by_groupid_order_by(
+        &self,
+        group_id: &str,
+        offset: i64,
+        limit: i64,
+        order_by: &str,
+        status: Option<String>,
+    ) -> AppResult<Vec<(proposals::Model, u64)>> {
+        let mut query = Proposals::find()
+            .filter(proposals::Column::GroupId.contains(group_id))
+            .offset(offset as u64)
+            .limit(limit as u64);
+
+        if let Some(s) = status {
+            if s == "Passed" {
+                query = query.filter(proposals::Column::EndTime.lt(chrono::Utc::now()));
+            } else if s == "Active" {
+                query = query.filter(proposals::Column::EndTime.gt(chrono::Utc::now()));
+            }
+        }
+
+        if order_by == "asc" {
+            query = query.order_by_asc(proposals::Column::CreatedAt);
+        } else {
+            query = query.order_by_desc(proposals::Column::CreatedAt);
+        }
+
+        let proposals = query.all(self.conn.as_ref()).await?;
+
+        let mut result = Vec::new();
+        for proposal in proposals {
+            //votes
+            let vote_count = self.count_votes_by_proposal_id(&proposal.proposal_id).await?;
+            result.push((proposal, vote_count));
+        }
+
+        Ok(result)
+    }
+
 
     pub async fn get_proposal_by_proposal_id(&self, proposal_id: &str) -> AppResult<proposals::Model> {
         match Proposals::find()

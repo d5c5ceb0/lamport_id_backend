@@ -7,6 +7,7 @@ mod m20250114_050441_create_vote_table;
 mod m20250114_052617_create_power_table;
 mod m20250116_063026_create_lamport_id_table;
 mod m20250116_131947_create_group_table;
+mod m20250125_140924_create_bindings_table;
 
 pub struct Migrator;
 
@@ -21,6 +22,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20250114_052617_create_power_table::Migration),
             Box::new(m20250116_063026_create_lamport_id_table::Migration),
             Box::new(m20250116_131947_create_group_table::Migration),
+            Box::new(m20250125_140924_create_bindings_table::Migration),
         ]
     }
 }

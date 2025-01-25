@@ -20,10 +20,15 @@ pub async fn create_vote(
     let claim = client.decode_token(user).unwrap();  //TODO address in jwt
 
     if cfg!(not(debug_assertions)) {
+        let unverified_data = UnVerifyVoteInfo {
+            proposal_id: data.proposal_id.clone(),
+            choice: data.choice.clone(),
+            channel: data.channel.clone(),
+        };
         //get user address by lamport id
         let user = state.store.get_user_by_uid(claim.sub.as_str()).await?;
 
-        let verified= verify_signature(&data, &sig, &user.address)?;
+        let verified= verify_signature(&unverified_data, &sig, &user.address)?;
         if !verified {
             return Err(AppError::InvalidSignature);
         }
@@ -143,9 +148,16 @@ pub async fn get_proposal_vote_by_voter_id(
 ) -> AppResult<Json<serde_json::Value>> {
     let client = state.jwt_handler.clone();
     let claim = client.decode_token(user).unwrap();
-    
-    let vote = state.store.get_proposal_vote_by_voter_id(claim.sub.as_str(), proposal_id.as_str()).await?;
-    Ok(Json(serde_json::json!({
-        "result": VoteInfo::from(vote)
-    })))
+
+    match state.store.get_proposal_vote_by_voter_id(claim.sub.as_str(), proposal_id.as_str()).await {
+        Ok(v) => Ok(Json(serde_json::json!({
+            "result": VoteInfo::from(v)
+        }))),
+        Err(AppError::CustomError(_)) => Ok(Json(serde_json::json!({
+                "result": ""
+            }))),
+        Err(e) => {
+            Err(e)
+        }
+    }
 }

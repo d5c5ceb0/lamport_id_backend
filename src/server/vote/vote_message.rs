@@ -16,6 +16,14 @@ pub struct VoteInfo {
     pub channel: String,
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct UnVerifyVoteInfo {
+    //pub voter_id: Option<String>,
+    pub proposal_id: String,
+    pub choice: String,
+    pub channel: String,
+}
+
 //impl into active model for VoteInfo
 impl Into<vote::ActiveModel> for VoteInfo {
     fn into(self) -> vote::ActiveModel {

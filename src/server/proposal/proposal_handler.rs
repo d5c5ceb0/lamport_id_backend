@@ -17,12 +17,15 @@ pub async fn create_proposal(
     let client = state.jwt_handler.clone();
     let claim = client.decode_token(user).unwrap();  //TODO address in jwt
 
+
     if cfg!(not(debug_assertions)) {
         //get user address by lamport id
         let user = state.store.get_user_by_uid(claim.sub.as_str()).await?;
+        tracing::info!("{:?}", user.address);
 
         let verified= verify_signature(&payload, &sig, &user.address)?;
         if !verified {
+            tracing::info!("{:?}", verified);
             return Err(AppError::InvalidSignature);
         }
     }
@@ -32,7 +35,7 @@ pub async fn create_proposal(
     let description = payload.description;
     let options = payload.options;
     let start_time = chrono::Utc::now();
-    let end_time = payload.end_time;
+    let end_time= chrono::DateTime::parse_from_rfc3339(payload.end_time.as_str()).map(|dt| dt.with_timezone(&chrono::Utc)).map_err(|e|AppError::CustomError(e.to_string()))?;
 
     //check payload options
     if options.len() < 2 {
@@ -90,6 +93,7 @@ pub async fn create_proposal(
     })))
 }
 
+#[allow(dead_code)]
 #[debug_handler]
 pub async fn get_proposal_list(
     State(state): State<SharedState>,
@@ -122,6 +126,110 @@ pub async fn get_proposal_list(
     })))
 }
 
+#[debug_handler]
+pub async fn get_proposal_list_order_by(
+    State(state): State<SharedState>,
+    Path(id): Path<String>,
+    Query(params): Query<GetProposalsRequest>,
+) -> AppResult<Json<serde_json::Value>> {
+    tracing::info!("group_id: {:?}", id);
+
+    let offset = params.offset;
+    let limit = params.limit;
+    let order = params.order;
+    let status = params.status;
+
+    let order_by = if let Some(o) = order {
+        if o!= "asc" && o!= "desc" {
+            return Err(AppError::InputValidateError("order must be asc or desc".into()));
+        }
+
+        o
+    } else {
+        "desc".to_string()
+    };
+
+    if let Some(ref s) = status {
+        if s!= "Passed" && s!= "Active" {
+            return Err(AppError::InputValidateError("status must be Passed or Active".into()));
+        }
+    }
+
+
+    let proposals = state.store.get_proposals_list_with_votes_by_groupid_order_by(id.as_str(), offset, limit, order_by.as_str(), status).await?;
+    
+    tracing::info!("proposals: {:?}", proposals);
+
+    let proposal_infos = proposals.into_iter().map( |(p, v)| {
+        let mut info = ProposalInfo::from(p);
+        info.ai_comments = "AI: This proposal has great potential and is in line with community goals.".to_string();
+        //info.votes = state.store.count_votes_by_proposal_id(info.proposal_id.as_str()).await.unwrap();
+        info.votes = v;
+        info.earn = v * (consts::POINTS_VOTE_VALUE as u64);
+        info.contribution = v * (-consts::ENERGY_VOTE_VALUE as u64);
+        info
+    }).collect::<Vec<ProposalInfo>>();
+
+    Ok(Json(serde_json::json!({
+        "result": {
+            "count": proposal_infos.len(),
+            "proposals": proposal_infos
+        }
+    })))
+}
+
+#[debug_handler]
+pub async fn get_default_proposal_list_order_by(
+    State(state): State<SharedState>,
+    Query(params): Query<GetProposalsRequest>,
+) -> AppResult<Json<serde_json::Value>> {
+    let group = state.store.get_default_group().await?;
+    let id = group.group_id;
+
+    tracing::info!("group_id: {:?}", id);
+
+    let offset = params.offset;
+    let limit = params.limit;
+    let order = params.order;
+    let status = params.status;
+
+    let order_by = if let Some(o) = order {
+        if o!= "asc" && o!= "desc" {
+            return Err(AppError::InputValidateError("order must be asc or desc".into()));
+        }
+
+        o
+    } else {
+        "desc".to_string()
+    };
+
+    if let Some(ref s) = status {
+        if s!= "Passed" && s!= "Active" {
+            return Err(AppError::InputValidateError("status must be Passed or Active".into()));
+        }
+    }
+
+    let proposals = state.store.get_proposals_list_with_votes_by_groupid_order_by(id.as_str(), offset, limit, order_by.as_str(), status).await?;
+    tracing::info!("proposals: {:?}", proposals);
+
+    let proposal_infos = proposals.into_iter().map( |(p, v)| {
+        let mut info = ProposalInfo::from(p);
+        info.ai_comments = "AI: This proposal has great potential and is in line with community goals.".to_string();
+        info.votes = v;
+        info.earn = v * (consts::POINTS_VOTE_VALUE as u64);
+        info.contribution = v * (-consts::ENERGY_VOTE_VALUE as u64);
+        info
+    }).collect::<Vec<ProposalInfo>>();
+
+    Ok(Json(serde_json::json!({
+        "result": {
+            "count": proposal_infos.len(),
+            "proposals": proposal_infos
+        }
+    })))
+}
+
+#[allow(dead_code)]
 #[debug_handler]
 pub async fn get_default_proposal_list(
     State(state): State<SharedState>,
@@ -181,7 +289,7 @@ pub async fn get_proposal_detail(
             "info": proposal_info,
             "stats": {
                 "votes": votes,
-                "for:": votes_for,
+                "for": votes_for,
                 "against": votes_against,
                 "abstain": votes_abstain,
             }

@@ -1,5 +1,5 @@
 mod auth_handler;
-mod auth_message;
+pub mod auth_message;
 mod auth_router;
 pub mod auth_service;
 

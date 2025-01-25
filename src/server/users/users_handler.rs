@@ -48,6 +48,7 @@ pub async fn register(
         if !verified {
             return Err(AppError::InvalidSignature);
         }
+        tracing::info!("signature verified success");
 
         let redis_client = RedisClient::from(state.redis.clone());
 
@@ -184,6 +185,7 @@ pub async fn login(
         if !verified {
             return Err(AppError::InvalidSignature);
         }
+        tracing::info!("signature verified success");
 
         let redis_client = RedisClient::from(state.redis.clone());
 

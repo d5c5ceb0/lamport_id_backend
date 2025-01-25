@@ -15,14 +15,6 @@ use axum::{
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize)]
-struct ExchangeTokenRespose {
-    access_token: String,
-    token_type: String,
-    expires_in: i64,
-    scope: String,
-}
-
 
 #[debug_handler]
 pub async fn auth_token(

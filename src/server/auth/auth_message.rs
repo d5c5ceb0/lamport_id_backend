@@ -54,3 +54,13 @@ pub struct UserInfo {
     pub username: String,
     pub profile_image_url: String,
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ExchangeTokenRespose {
+    pub access_token: String,
+    pub refresh_token: String,
+    pub token_type: String,
+    pub expires_in: i64,
+    pub scope: String,
+}
+
