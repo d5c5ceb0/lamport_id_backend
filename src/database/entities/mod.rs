@@ -2,6 +2,7 @@
 
 pub mod prelude;
 
+pub mod events;
 pub mod groups;
 pub mod lamport_id;
 pub mod points;

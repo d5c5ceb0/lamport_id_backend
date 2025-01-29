@@ -39,6 +39,14 @@ impl Storage {
         Ok(new_proposal)
     }
 
+    //count proposals by creator
+    pub async fn count_proposals_by_creator(&self, creator: &str) -> AppResult<u64> {
+        Ok(Proposals::find()
+            .filter(proposals::Column::CreatedBy.contains(creator))
+            .count(self.conn.as_ref())
+            .await?)
+    }
+
     //get proposals list by creator offset and limit
     pub async fn get_proposals_list_by_creator(&self, creator: String, offset: i64, limit: i64) -> AppResult<Vec<proposals::Model>> {
         Ok(Proposals::find()

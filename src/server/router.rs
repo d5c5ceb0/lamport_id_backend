@@ -1,4 +1,4 @@
-use super::{auth::auth_router, health::health_router, user::user_router, webset::index_router, group::group_router, proposal::proposal_router, vote::vote_router, users::users_router};
+use super::{auth::auth_router, health::health_router, user::user_router, webset::index_router, group::group_router, proposal::proposal_router, vote::vote_router, users::users_router, events::events_router};
 use crate::{app::SharedState, server::middlewares};
 use axum::{error_handling::HandleErrorLayer, http::Method, Router};
 use std::time::Duration;
@@ -17,6 +17,7 @@ pub fn app_router(state: SharedState) -> Router {
     let group_router = group_router(state.clone());
     let proposal_router = proposal_router(state.clone());
     let vote_router = vote_router(state.clone());
+    let events_router = events_router(state.clone());
 
     Router::new()
         .nest("/", index_router)
@@ -27,6 +28,7 @@ pub fn app_router(state: SharedState) -> Router {
         .nest("/api/v1/group", group_router)
         .nest("/api/v1/proposal", proposal_router)
         .nest("/api/v1/vote", vote_router)
+        .nest("/api/v1/events", events_router)
         .layer(
             CorsLayer::new()
                 .allow_origin(Any)

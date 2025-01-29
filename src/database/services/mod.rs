@@ -6,3 +6,4 @@ pub mod group;
 pub mod proposal;
 pub mod vote;
 pub mod binding;
+pub mod events;
