@@ -2,7 +2,10 @@ use super::proposal_message::*;
 use crate::{
     app::SharedState, 
     common::error::{AppResult,AppError},
-    server::middlewares::AuthToken,
+    server::{
+        middlewares::AuthToken,
+        events::events_message::Event
+    },
     common::consts,
     helpers::eip191::verify_signature,
 };
@@ -87,6 +90,20 @@ pub async fn create_proposal(
         .store
         .create_energy(claim.sub.clone(), consts::ENERGY_PROPOSAL, consts::ENERGY_PROPOSAL_VALUE)
         .await?;
+
+    if state.store.count_proposals_by_creator(claim.sub.as_str()).await? == 1 {
+        let queue = state.queue.clone();
+
+        let e = Event {
+            event_id: uuid::Uuid::new_v4().to_string(),
+            lamport_id: claim.sub.clone(),
+            event_type: consts::EVENT_TYPE_PROPOSAL.to_string(),
+            content: "First proposal submission".to_string(),
+            created_at: chrono::Utc::now(),
+        };
+        queue.add_queue_req_ex(consts::EVENT_TOPIC, e).await?;
+
+    }
 
     Ok(Json(serde_json::json!({
         "result": proposal_info

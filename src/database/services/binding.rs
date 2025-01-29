@@ -6,7 +6,6 @@ use crate::{
     },
 };
 use sea_orm::*;
-use uuid::Uuid;
 
 
 impl Storage {

@@ -103,6 +103,10 @@ impl LamportBinding {
         }
     }
 
+    pub fn encode(&self) -> AppResult<String> {
+        Ok(serde_json::to_string(self)?)
+    }
+
     pub fn add_tag(&mut self, tag: &str) {
         self.tags.push(tag.to_owned());
     }

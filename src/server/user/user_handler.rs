@@ -1,7 +1,7 @@
 use super::user_message::*;
 use crate::{app::SharedState, common::error::{AppResult, AppError}, server::middlewares::AuthToken};
 use axum::{debug_handler, extract::State, Json};
-use crate::server::auth::{auth_message::*, auth_service::*};
+use crate::server::auth::{auth_message::*};
 use reqwest::Client;
 use crate::common::consts;
 use serde::{Deserialize, Serialize};

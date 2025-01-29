@@ -2,7 +2,7 @@ use super::vote_message::*;
 use crate::{
     app::SharedState, 
     common::error::{AppResult, AppError}, 
-    server::{middlewares::AuthToken, proposal::proposal_service::get_proposal_status}, 
+    server::{middlewares::AuthToken, proposal::proposal_service::get_proposal_status, events::events_message::Event }, 
     common::consts,
     helpers::eip191::verify_signature,
 };
@@ -74,6 +74,20 @@ pub async fn create_vote(
         .store
         .create_energy(claim.sub.clone(), consts::ENERGY_VOTE, consts::ENERGY_VOTE_VALUE)
         .await?;
+
+    if state.store.count_votes_by_voter_id(claim.sub.as_str()).await? == 1 {
+        let queue = state.queue.clone();
+
+        let e = Event {
+            event_id: uuid::Uuid::new_v4().to_string(),
+            lamport_id: claim.sub.clone(),
+            event_type: consts::EVENT_TYPE_VOTE.to_string(),
+            content: "First vote cast".to_string(),
+            created_at: chrono::Utc::now(),
+        };
+        queue.add_queue_req_ex(consts::EVENT_TOPIC, e).await?;
+
+    }
 
     Ok(Json(serde_json::json!({
         "result": VoteInfo::from(created_vote)

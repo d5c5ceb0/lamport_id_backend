@@ -2,10 +2,8 @@ use super::users_message::*;
 use crate::{
     app::SharedState, 
     common::{error::{AppResult, AppError}, consts}, 
-    server::{middlewares::AuthToken, user::{UserResponse, User}, auth::auth_service::*},
+    server::{middlewares::AuthToken, user::{UserResponse, User}, auth::auth_service::*, events::events_message::Event},
     helpers::eip191::verify_signature,
-
-
 };
 use axum::{
     debug_handler,
@@ -129,6 +127,16 @@ pub async fn register(
 
         }
 
+        let queue = state.queue.clone();
+
+        let e = Event {
+            event_id: uuid::Uuid::new_v4().to_string(),
+            lamport_id: created_user.lamport_id.clone(),
+            event_type: consts::EVENT_TYPE_REGISTER.to_string(),
+            content: "First time using HetuVerse to generate Lamper ID".to_string(),
+            created_at: chrono::Utc::now(),
+        };
+        queue.add_queue_req_ex(consts::EVENT_TOPIC, e).await?;
 
         tracing::info!("[auth_token] database  user info: {:?}", created_user);
         created_user

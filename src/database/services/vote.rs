@@ -98,6 +98,25 @@ impl Storage {
             }
     }
 
+    //count vote by voter_id
+    pub async fn count_votes_by_voter_id(&self, voter_id: &str) -> AppResult<u64> {
+        let count = Vote::find()
+            .filter(vote::Column::VoterId.eq(voter_id))
+            .count(self.conn.as_ref())
+            .await?;
+
+        Ok(count)
+    }
+
+    //is voter in group 
+    pub async fn is_voter_in_group(&self, voter_id: &str, group_id: &str) -> AppResult<bool> {
+        let count = self.conn.query_one(Statement::from_string(
+                        self.conn.get_database_backend(),
+                        format!("SELECT COUNT(DISTINCT v.voter_id) FROM vote v INNER JOIN proposals p ON v.proposal_id = p.proposal_id WHERE p.group_id = \'{}\' AND v.voter_id = \'{}\';", group_id, voter_id),
+        )).await?.unwrap().try_get_by::<i64, _>(0).unwrap();
+
+        Ok(count > 0)
+    }
 
 }
 

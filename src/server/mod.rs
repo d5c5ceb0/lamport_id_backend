@@ -10,5 +10,6 @@ mod group;
 pub mod proposal;
 mod vote;
 mod users;
+pub mod events;
 
 pub use server::http_server_start;
