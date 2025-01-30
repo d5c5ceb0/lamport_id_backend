@@ -1,14 +1,19 @@
 use crate::{
-    common::{config::Config, consts, error::{AppResult,AppError}},
+    common::{
+        config::Config,
+        consts,
+        error::{AppError, AppResult},
+    },
     database,
     helpers::google_auth,
-    server::{http_server_start, middlewares::jwt::jwt_handler},
-    nostr, 
+    nostr,
     queue::msg_queue::{MessageQueue, RedisMessage, RedisStreamPool},
+    server::{http_server_start, middlewares::jwt::jwt_handler},
 };
+// use ::nostr::event::Kind;
+use oauth2::basic::BasicClient;
 use std::ops::Deref;
 use std::{path::PathBuf, sync::Arc};
-use oauth2::basic::BasicClient;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -35,14 +40,17 @@ impl AppState {
             jwt_handler,
             oauth: google_auth::oauth_client(config.auth),
             redis: redis::Client::open(config.redis.redis_url.as_str()).unwrap(),
-            queue: RedisStreamPool::new(config.redis.redis_url.as_str()).await.unwrap(),
+            queue: RedisStreamPool::new(config.redis.redis_url.as_str())
+                .await
+                .unwrap(),
             nclient: nostr::NostrClient::new(
                 config.nostr.priv_key.as_str(),
                 Some(config.nostr.ws_url.as_str()),
-            ).await.unwrap()
+            )
+            .await
+            .unwrap(),
         }
     }
-
 }
 
 #[derive(Clone)]
@@ -64,6 +72,14 @@ impl SharedState {
 
     pub async fn run(&self) -> AppResult<()> {
         let nclient = self.nclient.clone();
+        // let msg = nostr::LamportBinding {
+        //     pubkey: nclient.signer.public_key,
+        //     kind: Kind::Custom(2321),
+        //     content: "111".to_string(),
+        //     lamport_type: Some(nostr::LamportType::Create),
+        //     tags: vec!["LamportID = 1".to_string(), "Twitter = 2".to_string()],
+        // };
+        // nclient.sign_and_send(&msg).await.unwrap();
         let queue = self.queue.clone();
         let queue_topic = self.config.redis.topic.clone();
         tokio::spawn(async move {
@@ -72,27 +88,36 @@ impl SharedState {
                     Ok(msgs) => {
                         for (_k, m) in msgs.iter().enumerate() {
                             //Deserialize data
-                            let (_id, msg): (String, nostr::LamportBinding) = match serde_json::from_str(m.data.as_str()) {
-                                Ok(parsed) => parsed,
-                                Err(e) => {
-                                    tracing::error!("Failed to parse message: {}, error: {:?}", m.data, e);
-                                    if let Err(e) = queue.acknowledge(&queue_topic, &m.id).await {
+                            let (_id, msg): (String, nostr::LamportBinding) =
+                                match serde_json::from_str(m.data.as_str()) {
+                                    Ok(parsed) => parsed,
+                                    Err(e) => {
                                         tracing::error!(
-                                            "Failed to acknowledge message: {}, error: {:?}",
-                                            m.id,
+                                            "Failed to parse message: {}, error: {:?}",
+                                            m.data,
                                             e
                                         );
+                                        if let Err(e) = queue.acknowledge(&queue_topic, &m.id).await
+                                        {
+                                            tracing::error!(
+                                                "Failed to acknowledge message: {}, error: {:?}",
+                                                m.id,
+                                                e
+                                            );
+                                        }
+                                        continue;
                                     }
-                                    continue;
-                                }
-                            };
+                                };
 
                             nclient.sign_and_send(&msg).await.unwrap();
 
-
                             // ack
                             if let Err(e) = queue.acknowledge(&queue_topic, &m.id).await {
-                                tracing::error!("Failed to acknowledge message: {}, error: {:?}", m.id, e);
+                                tracing::error!(
+                                    "Failed to acknowledge message: {}, error: {:?}",
+                                    m.id,
+                                    e
+                                );
                             }
                         }
                     }
@@ -104,7 +129,6 @@ impl SharedState {
             }
         });
 
-
         http_server_start(self.clone()).await?;
 
         Ok(())
@@ -113,12 +137,7 @@ impl SharedState {
 
 impl RedisStreamPool {
     #[allow(dead_code)]
-    async fn add_queue_req(
-        &self,
-        topic: &str,
-        id: String,
-        p: serde_json::Value,
-    ) -> AppResult<()> {
+    async fn add_queue_req(&self, topic: &str, id: String, p: serde_json::Value) -> AppResult<()> {
         let redis_msg = match RedisMessage::new((id, p)) {
             Ok(v) => v,
             Err(e) => {
@@ -129,12 +148,9 @@ impl RedisStreamPool {
         tracing::info!("Product message: data={:?}", redis_msg);
         if let Err(e) = self.produce(topic, &redis_msg).await {
             tracing::error!("redis queue produce error: {:?}", e);
-            return Err(AppError::CustomError(
-                "redis queue produce error".into(),
-            ));
+            return Err(AppError::CustomError("redis queue produce error".into()));
         }
 
         Ok(())
     }
-
 }

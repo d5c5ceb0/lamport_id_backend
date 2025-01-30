@@ -1,13 +1,12 @@
-use crate::common::error::AppResult;
-use nostr_sdk::prelude::*;
+use crate::common::error::{AppError, AppResult};
 use nostr::event::{Event, EventId, UnsignedEvent};
+use nostr_sdk::prelude::*;
 use serde::{Deserialize, Serialize};
-
 
 #[derive(Debug, Clone)]
 pub struct NostrClient {
-    signer: Keys,         // The cryptographic keys used for signing events.
-    client: Client,       // The underlying Nostr SDK client.
+    pub signer: Keys,   // The cryptographic keys used for signing events.
+    pub client: Client, // The underlying Nostr SDK client.
 }
 
 impl NostrClient {
@@ -37,11 +36,38 @@ impl NostrClient {
     }
 
     pub async fn sign_and_send(&self, msg: &LamportBinding) -> AppResult<EventId> {
-        let event: UnsignedEvent = msg.clone().into();
-        let signed = event.sign(&self.signer.clone()).await?;
-        self.send_event(signed).await
+        if let Some(t) = msg.lamport_type.clone() {
+            let lamport_event = match t {
+                LamportType::Create => {
+                    LamportBinding::new_kind2321(msg.pubkey, "lamport_id", "twitter")
+                }
+                LamportType::Bind => {
+                    LamportBinding::new_kind2322(msg.pubkey, "lamport_id", "address", "sig")
+                }
+                LamportType::Invite => LamportBinding::new_kind2323(
+                    msg.pubkey,
+                    "lamport_id",
+                    "project",
+                    "invitee",
+                    "link",
+                ),
+            };
+            let event: UnsignedEvent = lamport_event.clone().into();
+            let signed = event.sign(&self.signer.clone()).await?;
+            self.send_event(signed).await
+        } else {
+            Err(AppError::InvalidLamportType)
+        }
     }
+}
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum LamportType {
+    Create,
+    Invite,
+    Bind,
+    // Vote,
+    // Voting,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -50,6 +76,7 @@ pub struct LamportBinding {
     pub kind: Kind,
     pub tags: Vec<String>,
     pub content: String,
+    pub lamport_type: Option<LamportType>,
 }
 
 impl From<LamportBinding> for UnsignedEvent {
@@ -61,12 +88,18 @@ impl From<LamportBinding> for UnsignedEvent {
 }
 
 impl LamportBinding {
-    pub fn new(pubkey: PublicKey, kind: Kind, content: &str) -> Self {
+    pub fn new(
+        pubkey: PublicKey,
+        kind: Kind,
+        content: &str,
+        lamport_type: Option<LamportType>,
+    ) -> Self {
         Self {
             pubkey,
             kind,
             tags: Default::default(),
             content: content.to_owned(),
+            lamport_type: lamport_type,
         }
     }
 
@@ -78,8 +111,13 @@ impl LamportBinding {
         Self {
             pubkey,
             kind: Kind::Custom(2321),
-            tags: vec![format!("LamportID = {}", lamport_id), format!("Twitter = {}", twitter)],
+            tags: vec![
+                format!("LamportID = {}", lamport_id),
+                format!("Twitter = {}", twitter),
+                format!("lmport_type = {:?}", LamportType::Create),
+            ],
             content: format!("LamportID:{}", lamport_id),
+            lamport_type: Some(LamportType::Create),
         }
     }
 
@@ -87,17 +125,36 @@ impl LamportBinding {
         Self {
             pubkey,
             kind: Kind::Custom(2322),
-            tags: vec![format!("LamportID = {}", lamport_id), format!("Address = {}", address), format!("sig = {}", sig)],
-            content: format!("LamportID:{}", lamport_id),
+            tags: vec![
+                format!("LamportID = {}", lamport_id),
+                format!("Address = {}", address),
+                format!("sig = {}", sig),
+                format!("lmport_type = {:?}", LamportType::Bind),
+            ],
+            content: format!("LamportID:{} bind address:{}", lamport_id, address),
+            lamport_type: Some(LamportType::Bind),
         }
     }
 
-    pub fn new_kind2323(pubkey: PublicKey, lamport_id: &str, project: &str, invitee: &str, link: &str) -> Self {
+    pub fn new_kind2323(
+        pubkey: PublicKey,
+        lamport_id: &str,
+        project: &str,
+        invitee: &str,
+        link: &str,
+    ) -> Self {
         Self {
             pubkey,
             kind: Kind::Custom(2323),
-            tags: vec![format!("LamportID = {}", lamport_id), format!("Project = {}", project), format!("Invitee = {}", invitee), format!("Link = {}", link)],
+            tags: vec![
+                format!("LamportID = {}", lamport_id),
+                format!("p = {}", project),
+                format!("Invitee = {}", invitee),
+                format!("lmport_type = {:?}", LamportType::Invite),
+                "i =invite".to_string(),
+            ],
             content: format!("{} Invite {}, Link:{}", lamport_id, invitee, link),
+            lamport_type: Some(LamportType::Invite),
         }
     }
 }
