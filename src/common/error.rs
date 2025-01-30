@@ -72,7 +72,10 @@ pub enum AppError {
     ConflictError(String),
 
     #[error("invalid signature")]
-    InvalidSignature
+    InvalidSignature,
+
+    #[error("invalid lamport type")]
+    InvalidLamportType,
 }
 
 impl IntoResponse for AppError {
@@ -97,6 +100,7 @@ impl IntoResponse for AppError {
             Self::NostrSdkError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Self::ConflictError(_) => StatusCode::CONFLICT,
             Self::InvalidSignature => StatusCode::UNPROCESSABLE_ENTITY,
+            Self::InvalidLamportType => StatusCode::INTERNAL_SERVER_ERROR,
         };
 
         (status, Json(serde_json::json!({"error":self.to_string()}))).into_response()
