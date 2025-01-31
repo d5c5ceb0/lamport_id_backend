@@ -1,5 +1,6 @@
 use crate::database::entities::vote;
 use sea_orm::*;
+use uuid::Uuid;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CreateVoteRequest {
@@ -28,6 +29,7 @@ pub struct UnVerifyVoteInfo {
 impl Into<vote::ActiveModel> for VoteInfo {
     fn into(self) -> vote::ActiveModel {
         vote::ActiveModel {
+            uid: Set(Uuid::new_v4().to_string()),
             voter_id: Set(self.voter_id.unwrap()),
             proposal_id: Set(self.proposal_id),
             choice: Set(self.choice),

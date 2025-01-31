@@ -6,6 +6,7 @@ use reqwest::Client;
 use crate::common::consts;
 use serde::{Deserialize, Serialize};
 use crate::database::entities::twitter_binding;
+use crate::nostr;
 
 #[debug_handler]
 pub async fn get_user_info(
@@ -198,6 +199,13 @@ pub async fn binding_account(
 
 
     tracing::info!("[auth_token] database  user info: {:?}", created_binding);
+
+    //pub fn new_kind2321(pubkey: PublicKey, lamport_id: &str, twitter: &str) -> Self {
+    state.queue.add_queue_req_ex(consts::NOSTR_TOPIC, nostr::LamportBinding::new_kind2321(
+        state.nclient.get_pub_key(),
+        claim.sub.as_str(),
+        created_binding.user_name.as_str(),
+    )).await?;
 
     Ok(Json(serde_json::json!({
         "result": {

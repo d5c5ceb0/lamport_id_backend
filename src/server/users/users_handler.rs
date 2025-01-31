@@ -10,6 +10,7 @@ use axum::{
     extract::{State, Path, Json as EJson},
     Json, 
 };
+use crate::nostr;
 
 
 //check username
@@ -137,6 +138,8 @@ pub async fn register(
             created_at: chrono::Utc::now(),
         };
         queue.add_queue_req_ex(consts::EVENT_TOPIC, e).await?;
+
+        queue.add_queue_req_ex(consts::NOSTR_TOPIC, nostr::LamportBinding::new_kind2322(state.nclient.get_pub_key(),created_user.lamport_id.as_str(), created_user.address.as_str(),"")).await?;
 
         tracing::info!("[auth_token] database  user info: {:?}", created_user);
         created_user

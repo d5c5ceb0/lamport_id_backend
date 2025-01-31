@@ -72,24 +72,17 @@ impl SharedState {
 
     pub async fn run(&self) -> AppResult<()> {
         let nclient = self.nclient.clone();
-        // let msg = nostr::LamportBinding {
-        //     pubkey: nclient.signer.public_key,
-        //     kind: Kind::Custom(2321),
-        //     content: "111".to_string(),
-        //     lamport_type: Some(nostr::LamportType::Create),
-        //     tags: vec!["LamportID = 1".to_string(), "Twitter = 2".to_string()],
-        // };
-        // nclient.sign_and_send(&msg).await.unwrap();
         let queue = self.queue.clone();
-        let queue_topic = self.config.redis.topic.clone();
+
+        //let queue_topic = self.config.redis.topic.clone();
+        let queue_topic = consts::NOSTR_TOPIC;
         tokio::spawn(async move {
             loop {
-                match queue.consume(&queue_topic).await {
+                match queue.consume(queue_topic).await {
                     Ok(msgs) => {
                         for (_k, m) in msgs.iter().enumerate() {
                             //Deserialize data
-                            let (_id, msg): (String, nostr::LamportBinding) =
-                                match serde_json::from_str(m.data.as_str()) {
+                            let msg: nostr::LamportBinding = match serde_json::from_str(m.data.as_str()) {
                                     Ok(parsed) => parsed,
                                     Err(e) => {
                                         tracing::error!(
@@ -97,7 +90,7 @@ impl SharedState {
                                             m.data,
                                             e
                                         );
-                                        if let Err(e) = queue.acknowledge(&queue_topic, &m.id).await
+                                        if let Err(e) = queue.acknowledge(queue_topic, &m.id).await
                                         {
                                             tracing::error!(
                                                 "Failed to acknowledge message: {}, error: {:?}",
@@ -109,10 +102,11 @@ impl SharedState {
                                     }
                                 };
 
+                            tracing::info!("Received message: {:?}", msg);
                             nclient.sign_and_send(&msg).await.unwrap();
 
                             // ack
-                            if let Err(e) = queue.acknowledge(&queue_topic, &m.id).await {
+                            if let Err(e) = queue.acknowledge(queue_topic, &m.id).await {
                                 tracing::error!(
                                     "Failed to acknowledge message: {}, error: {:?}",
                                     m.id,

@@ -5,6 +5,7 @@ use crate::{
     server::{middlewares::AuthToken, proposal::proposal_service::get_proposal_status, events::events_message::Event }, 
     common::consts,
     helpers::eip191::verify_signature,
+    nostr,
 };
 use axum::{debug_handler, extract::Path, extract::State, extract::Query, extract::Json as EJson, Json};
 
@@ -75,9 +76,23 @@ pub async fn create_vote(
         .create_energy(claim.sub.clone(), consts::ENERGY_VOTE, consts::ENERGY_VOTE_VALUE)
         .await?;
 
-    if state.store.count_votes_by_voter_id(claim.sub.as_str()).await? == 1 {
-        let queue = state.queue.clone();
+    let queue = state.queue.clone();
 
+    //get group by proposal group id
+    let group = state.store.get_group_by_groupid(proposal.group_id.as_str()).await?;
+
+    if !state.store.is_voter_in_group(claim.sub.as_str(), proposal.group_id.as_str()).await? {
+        let e = Event {
+            event_id: uuid::Uuid::new_v4().to_string(),
+            lamport_id: claim.sub.clone(),
+            event_type: consts::EVENT_TYPE_JOIN.to_string(),
+            content: format!("First time joining {} DAO", group.name.as_str()),
+            created_at: chrono::Utc::now(),
+        };
+        queue.add_queue_req_ex(consts::EVENT_TOPIC, e).await?;
+    }
+
+    if state.store.count_votes_by_voter_id(claim.sub.as_str()).await? == 1 {
         let e = Event {
             event_id: uuid::Uuid::new_v4().to_string(),
             lamport_id: claim.sub.clone(),
@@ -88,6 +103,18 @@ pub async fn create_vote(
         queue.add_queue_req_ex(consts::EVENT_TOPIC, e).await?;
 
     }
+
+    queue.add_queue_req_ex(consts::NOSTR_TOPIC, nostr::LamportBinding::new_kind_vote(
+        state.nclient.get_pub_key(),
+        claim.sub.as_str(),
+        created_vote.uid.as_str(),
+        proposal.title.as_str(),
+        format!("{} vote for {}", claim.sub.as_str(), proposal.title.as_str()).as_str(),
+        proposal.start_time.to_string().as_str(),
+        proposal.end_time.to_string().as_str(),
+        proposal.options.join(",").as_str(),
+        "",
+    )).await?;
 
     Ok(Json(serde_json::json!({
         "result": VoteInfo::from(created_vote)

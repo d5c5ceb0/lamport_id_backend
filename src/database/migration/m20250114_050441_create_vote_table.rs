@@ -11,6 +11,7 @@ impl MigrationTrait for Migration {
                 Table::create()
                 .table(Vote::Table)
                 .col(ColumnDef::new(Vote::Id).integer().primary_key().auto_increment())
+                .col(ColumnDef::new(Vote::Uid).string().not_null().unique_key())
                 .col(ColumnDef::new(Vote::VoterId).string().not_null())
                 .col(ColumnDef::new(Vote::ProposalId).string().not_null())
                 .col(ColumnDef::new(Vote::Choice).string().not_null())
@@ -33,6 +34,7 @@ impl MigrationTrait for Migration {
 enum Vote {
     Table,
     Id,
+    Uid,
     VoterId,
     ProposalId,
     Choice,
