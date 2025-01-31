@@ -34,9 +34,11 @@ pub const PROPOSAL_STATUS_PASSED: &str = "Passed";
 pub const PROPOSAL_DESCRIPTION_MAX_LENGTH: i32 = 4000;
 
 pub const EVENT_TOPIC: &str = "events";
+pub const NOSTR_TOPIC: &str = "nostr";
 
 pub const EVENT_TYPE_VOTE: &str = "vote";
 pub const EVENT_TYPE_PROPOSAL: &str = "proposal";
 pub const EVENT_TYPE_INVITE: &str = "invite";
 pub const EVENT_TYPE_BINDING: &str = "binding";
 pub const EVENT_TYPE_REGISTER: &str = "register";
+pub const EVENT_TYPE_JOIN: &str = "join";
