@@ -19,10 +19,35 @@ impl MigrationTrait for Migration {
                 .col(ColumnDef::new(Vote::CreatedAt).timestamp_with_time_zone().not_null())
                 .to_owned(),
         )
-            .await
+            .await?;
+
+        // Create indexes
+        manager
+            .create_index(
+                Index::create()
+                .name("idx_proposal_voter")
+                .table(Vote::Table)
+                .col(Vote::ProposalId)
+                .col(Vote::VoterId)
+                .unique()
+                .to_owned(),
+            )
+            .await?;
+
+        Ok(())
+
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_index(
+                Index::drop()
+                .name("idx_proposal_voter")
+                .table(Vote::Table)
+                .to_owned(),
+            )
+            .await?;
+
         manager
             .drop_table(Table::drop().table(Vote::Table).to_owned())
             .await
@@ -41,4 +66,5 @@ enum Vote {
     Channel,
     CreatedAt,
 }
+
 
