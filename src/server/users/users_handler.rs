@@ -2,8 +2,8 @@ use super::users_message::*;
 use crate::{
     app::SharedState, 
     common::{error::{AppResult, AppError}, consts}, 
-    server::{middlewares::AuthToken, user::{UserResponse, User}, auth::auth_service::*, events::events_message::Event},
-    helpers::eip191::verify_signature,
+    server::{middlewares::AuthToken, user::{UserResponse, User}, events::events_message::Event},
+    helpers::{eip191::verify_signature, redis_cache::*},
 };
 use axum::{
     debug_handler,
