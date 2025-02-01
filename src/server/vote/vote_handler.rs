@@ -81,7 +81,8 @@ pub async fn create_vote(
     //get group by proposal group id
     let group = state.store.get_group_by_groupid(proposal.group_id.as_str()).await?;
 
-    if !state.store.is_voter_in_group(claim.sub.as_str(), proposal.group_id.as_str()).await? {
+
+    if state.store.count_votes_by_group_id_and_voter_id(proposal.group_id.as_str(), claim.sub.as_str()).await? == 1 {
         let e = Event {
             event_id: uuid::Uuid::new_v4().to_string(),
             lamport_id: claim.sub.clone(),
@@ -90,6 +91,7 @@ pub async fn create_vote(
             created_at: chrono::Utc::now(),
         };
         queue.add_queue_req_ex(consts::EVENT_TOPIC, e).await?;
+
     }
 
     if state.store.count_votes_by_voter_id(claim.sub.as_str()).await? == 1 {
