@@ -1,5 +1,7 @@
 use oauth2::CsrfToken;
 use redis::AsyncCommands;
+use serde::{Serialize, Deserialize};
+use crate::common::error::{AppResult, AppError};
 
 pub fn gen_csrf_token() -> String {
     CsrfToken::new_random().secret().to_string()
@@ -75,6 +77,29 @@ impl RedisClient {
     pub async fn del_nonce(&self, address: &str) -> Result<(), redis::RedisError> {
         let mut conn = self.0.get_multiplexed_async_connection().await?;
         let _: () = conn.del(address).await?;
+
+        Ok(())
+    }
+
+    //get data from cache
+    pub async fn get_data<T>(&self, key: &str) -> AppResult<T>
+    where
+        T: for<'de> serde::de::Deserialize<'de>
+    {
+        let mut conn = self.0.get_multiplexed_async_connection().await?;
+        let cached_data: Option<String> = conn.get(key).await?;
+
+        match cached_data {
+            Some(val) => Ok(serde_json::from_str(&val)?),
+            None => Err(AppError::CustomError("Data not found".to_string())),
+        }
+
+    }
+
+    //set data to cache
+    pub async fn set_data(&self, key: &str, value: impl Serialize) -> AppResult<()> {
+        let mut conn = self.0.get_multiplexed_async_connection().await?;
+        let _: () = conn.set_ex(key, serde_json::to_string(&value)?, 3600).await?;
 
         Ok(())
     }
