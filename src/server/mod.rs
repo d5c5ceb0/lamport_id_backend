@@ -1,15 +1,15 @@
-mod auth;
-mod health;
-mod message;
+pub mod auth;
+pub mod health;
+pub mod message;
 pub mod middlewares;
-mod router;
-mod server;
-mod user;
-mod webset;
-mod group;
+pub mod router;
+pub mod server;
+pub mod user;
+pub mod webset;
+pub mod group;
 pub mod proposal;
-mod vote;
-mod users;
+pub mod vote;
+pub mod users;
 pub mod events;
 
 pub use server::http_server_start;

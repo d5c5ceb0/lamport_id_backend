@@ -1,6 +1,20 @@
 use super::group_message::*;
-use crate::{app::SharedState, common::error::AppResult, server::middlewares::AuthToken};
-use axum::{debug_handler, extract::Json as EJson, extract::State, extract::Query, Json};
+use super::group_service;
+use crate::{
+    app::SharedState, 
+    common::error::AppResult, 
+    server::middlewares::AuthToken
+};
+use axum::{
+    debug_handler, 
+    extract::{
+        Json as EJson,
+        State,
+        Query,
+        Path
+    }, 
+    Json
+};
 use std::convert::Into;
 
 
@@ -19,8 +33,15 @@ pub async fn create_group(
     let client = state.jwt_handler.clone();
     let claim = client.decode_token(user).unwrap();
 
-    let new_group = state.store.create_group(name, logo, description, website, twitter, claim.sub).await?;
-    let group_info = GroupInfo::from(new_group);
+    let group_info = group_service::create_group(
+        &state,
+        name,
+        logo,
+        description,
+        website,
+        twitter,
+        claim.sub,
+    ).await?;
 
     Ok(Json(serde_json::json!({
         "result": group_info
@@ -31,15 +52,15 @@ pub async fn create_group(
 #[debug_handler]
 pub async fn get_group_list(
     State(state): State<SharedState>,
-    //AuthToken(user): AuthToken,
     Query(GetGroupListRequest { offset, limit }): Query<GetGroupListRequest>,
 ) -> AppResult<Json<serde_json::Value>> {
-    let groups = state.store.get_group_list(offset, limit).await?;
+
+    let groups = group_service::get_group_list(&state, offset, limit).await?;
 
     Ok(Json(serde_json::json!({
         "result": {
             "count": groups.len(),
-            "groups":groups.into_iter().map(GroupInfo::from).collect::<Vec<GroupInfo>>()
+            "groups":groups
         }
     })))
 }
@@ -48,29 +69,32 @@ pub async fn get_group_list(
 pub async fn get_group_info(
     State(state): State<SharedState>,
 ) -> AppResult<Json<serde_json::Value>> {
-    let group = state.store.get_default_group().await?;
-    let group_info = GroupInfo::from(group.clone());
 
-    let proposals = state.store.count_proposals_by_groupid(group.group_id.as_str()).await?;
-
-    let votes = state.store.count_votes_by_group_id(group.group_id.as_str()).await?;
-
-    let members = state.store.count_voters_by_group_id(group.group_id.as_str()).await?;
+    let group_info = group_service::get_default_group(&state).await?;
+    let group_state = group_service::get_group_stats(&state, group_info.group_id.as_str()).await?;
 
     Ok(Json(serde_json::json!({
         "result": {
             "info": group_info,
-            "stats": {
-                "ai_score": 5,
-                "ai_rating": 211,
-                "particaipation_proposals": 105,
-                "recommended_proposals": 105,
-                "activity_contribution": 250,
-                "daily_average_msg": 50,
-                "members": members,
-                "proposals": proposals,
-                "votes": votes,
-            }
+            "stats": group_state
+        }
+    })))
+}
+
+#[allow(unused)]
+#[debug_handler]
+pub async fn get_group_info_by_groupid(
+    State(state): State<SharedState>,
+    Path(group_id): Path<String>,
+) -> AppResult<Json<serde_json::Value>> {
+
+    let group_info = group_service::get_group_info(&state,group_id.as_str()).await?;
+    let group_state = group_service::get_group_stats(&state, group_id.as_str()).await?;
+
+    Ok(Json(serde_json::json!({
+        "result": {
+            "info": group_info,
+            "stats": group_state
         }
     })))
 }

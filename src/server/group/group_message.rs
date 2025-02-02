@@ -46,3 +46,16 @@ pub struct GetGroupListRequest {
     pub offset: i64,
     pub limit: i64,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GroupStats {
+    pub ai_score: i64,
+    pub ai_rating: i64,
+    pub particaipation_proposals: i64,
+    pub recommended_proposals: i64,
+    pub activity_contribution: i64,
+    pub daily_average_msg: i64,
+    pub members: i64,
+    pub proposals: i64,
+    pub votes: i64,
+}

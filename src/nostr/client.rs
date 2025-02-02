@@ -1,4 +1,4 @@
-use crate::common::error::{AppError, AppResult};
+use crate::common::error::AppResult;
 use nostr::event::{Event, EventId, UnsignedEvent};
 use nostr_sdk::prelude::*;
 use serde::{Deserialize, Serialize};

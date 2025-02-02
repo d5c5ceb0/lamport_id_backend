@@ -104,4 +104,16 @@ impl RedisClient {
         Ok(())
     }
 
+    //invalidate cache
+    pub async fn invalidate_cache(&self, key: &str) -> AppResult<()> {
+        let mut conn = self.0.get_multiplexed_async_connection().await?;
+
+        let keys: Vec<String> = conn.keys(key).await?;
+        if !keys.is_empty() {
+            let _: () = conn.del(keys).await?;
+        }
+
+        Ok(())
+    }
+
 }
