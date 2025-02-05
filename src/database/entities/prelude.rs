@@ -6,6 +6,7 @@ pub use super::lamport_id::Entity as LamportId;
 pub use super::points::Entity as Points;
 pub use super::power::Entity as Power;
 pub use super::proposals::Entity as Proposals;
+pub use super::telegram_binding::Entity as TelegramBinding;
 pub use super::twitter_binding::Entity as TwitterBinding;
 pub use super::users::Entity as Users;
 pub use super::vote::Entity as Vote;

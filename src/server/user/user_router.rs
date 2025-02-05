@@ -9,6 +9,7 @@ pub fn user_router(state: SharedState) -> Router<SharedState> {
         .route("/count", get(get_user_count))
         .route("/stats", get(get_user_stats))
         .route("/bindings", post(binding_account).get(get_user_bindings))
+        .route("/binding/telegram", post(binding_telegram))
         .layer(middleware::from_fn_with_state(
             state,
             middlewares::auth_middleware,

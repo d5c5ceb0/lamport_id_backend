@@ -8,6 +8,7 @@ pub mod lamport_id;
 pub mod points;
 pub mod power;
 pub mod proposals;
+pub mod telegram_binding;
 pub mod twitter_binding;
 pub mod users;
 pub mod vote;

@@ -9,8 +9,10 @@ use crate::{
         middlewares::AuthToken,
         auth::auth_message::*
     },
+    database::dals::telegram_binding,
     database::services::binding,
     nostr,
+    helpers::redis_cache::*,
 };
 use axum::{debug_handler, extract::State, Json};
 use serde::{Deserialize, Serialize};
@@ -268,4 +270,78 @@ pub async fn get_user_bindings(
         Err(e) => Err(e),
 
     }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct TelegramParams {
+    pub user_id: String,
+    pub token: String,
+}
+
+//telgram binding response
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BindingTelegramResponse {
+    pub lamport_id: String,
+    pub user_id: String,
+}
+
+impl From<telegram_binding::TelegramBindingModel> for BindingTelegramResponse {
+    fn from(binding: telegram_binding::TelegramBindingModel) -> Self {
+        Self {
+            lamport_id: binding.lamport_id,
+            user_id: binding.telegram_id,
+        }
+    }
+}
+
+pub async fn binding_telegram(
+    State(state): State<SharedState>,
+    AuthToken(user): AuthToken,
+    Json(params): Json<TelegramParams>,
+) -> AppResult<Json<serde_json::Value>> {
+    let client = state.jwt_handler.clone();
+    let claim = client.decode_token(user).unwrap();
+
+
+    let redis_client = RedisClient::from(state.redis.clone());
+
+    if let Ok(token) = redis_client.get_csrf_token(params.token.as_str()).await {
+        tracing::info!("got token: {:?} by key: {:?}", token, params.token);
+    } else {
+        tracing::error!("got token err: wrong token:{:?} ", params.token);
+        return Err(AppError::InputValidateError(
+                "token is not existing".into(),
+        ));
+    }
+
+    match redis_client.del_csrf_token(params.token.as_str()).await {
+        Ok(_) => {
+            tracing::info!("delete token success");
+        }
+        Err(e) => {
+            tracing::error!("delete token err: {:?}", e);
+        }
+    }
+
+    //save to db
+    let binding = state.store.create_telegram_binding(telegram_binding::TelegramBindingModel::new(
+        claim.sub.clone(),
+        params.user_id.clone(),
+    )).await?;
+
+    //award point
+    state
+        .store
+        .award_points(claim.sub.clone(), consts::POINTS_BINDING, consts::POINTS_BINDING_VALUE, "telegram")
+        .await?;
+
+    //consume energy 
+    state
+        .store
+        .create_energy(claim.sub.clone(), consts::ENERGY_BINDING, consts::ENERGY_BINDING_VALUE)
+        .await?;
+
+    Ok(Json(serde_json::json!({
+        "result": BindingTelegramResponse::from(binding)
+    })))
 }
