@@ -7,7 +7,10 @@ use sea_orm::entity::prelude::*;
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
-    pub user_id: String,
+    #[sea_orm(unique)]
+    pub uid: String,
+    #[sea_orm(unique)]
+    pub lamport_id: String,
     #[sea_orm(unique)]
     pub x_id: String,
     pub name: String,
@@ -18,6 +21,12 @@ pub struct Model {
     pub refresh_token: String,
     pub token_type: String,
     pub scope: String,
+    pub retweet: i32,
+    pub mention: i32,
+    pub comment: i32,
+    pub quote: i32,
+    pub updated_at: DateTimeWithTimeZone,
+    pub created_at: DateTimeWithTimeZone,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

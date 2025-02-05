@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 pub struct RegisterRequest {
     pub data: UserInfo,
     pub invited_by: Option<String>,
+    pub invited_channel: Option<String>,
     pub sig: String,
 }
 
@@ -30,7 +31,8 @@ impl From<RegisterRequest> for User {
             image: item.data.image,
             email: item.data.email,
             verified: false,
-            invited_by: None,
+            invited_by: item.invited_by,
+            invited_channel: item.invited_channel,
             invite_code: user_service::gen_invite_code(8),
         }
     }

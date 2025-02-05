@@ -13,7 +13,7 @@ pub struct GetEventListRequest {
 #[debug_handler]
 pub async fn get_events(
     State(state): State<SharedState>,
-    AuthToken(user): AuthToken,
+    AuthToken(_user): AuthToken,
     Query(GetEventListRequest { offset, limit }): Query<GetEventListRequest>,
     Path(lamport_id): Path<String>,
 ) -> AppResult<Json<serde_json::Value>> {

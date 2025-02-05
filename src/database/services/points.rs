@@ -1,16 +1,13 @@
 use crate::{
     common::error::AppResult,
     database::{
-        entities::{points, prelude::Points},
+        dals::points,
         Storage,
     },
+    helpers::redis_cache::*,
 };
-use sea_orm::*;
 
-#[derive(FromQueryResult, Debug)]
-struct AggregationResult {
-    total_points: Option<i64>, // Match the alias name
-}
+pub type Point = points::PointModel;
 
 impl Storage {
     pub async fn award_points(
@@ -19,58 +16,42 @@ impl Storage {
         point_type: &str,
         points: i32,
         description: &str,
-    ) -> AppResult<points::Model> {
-        let point_entry = points::ActiveModel {
-            lamport_id: Set(user_uid),
-            point_type: Set(point_type.to_owned()),
-            amounts: Set(points),
-            description: Set(Some(description.to_owned())),
-            created_at: Set(chrono::Utc::now().into()),
-            ..Default::default()
-        };
+    ) -> AppResult<Point> {
 
-        let point = point_entry.insert(self.conn.as_ref()).await?;
+        let point = self.create_points(
+            user_uid,
+            point_type,
+            points,
+            description,
+        ).await?;
 
         Ok(point)
     }
 
     pub async fn get_user_points(&self, user_uid: &str) -> AppResult<i64> {
-        match Points::find()
-            .filter(points::Column::LamportId.eq(user_uid))
-            .select_only()
-            .column_as(points::Column::Amounts.sum(), "total_points")
-            .into_model::<AggregationResult>()
-            .one(self.conn.as_ref())
-            .await?
-        {
-            Some(aggr_result) => Ok(aggr_result.total_points.unwrap_or(0)),
-            None => Ok(0),
-        }
-    }
-    pub async fn cleanup_expired_point(&self) -> AppResult<()> {
-        use sea_orm::EntityTrait;
-
-        points::Entity::delete_many()
-            .filter(points::Column::ExpiresAt.lt(chrono::Utc::now()))
-            .exec(self.conn.as_ref())
-            .await?;
-
-        Ok(())
+        self.get_points_by_lamport_id(user_uid).await
     }
 
     pub async fn get_user_daily_points(&self, user_uid: &str) -> AppResult<i64> {
-        let today = chrono::Utc::now().date_naive();
-        match Points::find()
-            .filter(points::Column::LamportId.eq(user_uid))
-            .filter(points::Column::CreatedAt.gt(today.and_hms_opt(0, 0, 0)))
-            .select_only()
-            .column_as(points::Column::Amounts.sum(), "total_points")
-            .into_model::<AggregationResult>()
-            .one(self.conn.as_ref())
-            .await?
-        {
-            Some(aggr_result) => Ok(aggr_result.total_points.unwrap_or(0)),
-            None => Ok(0),
-        }
+        self.get_daily_points_lamport_id(user_uid).await
+    }
+
+    //get points by lamport_id and point_type and description
+    pub async fn get_points_by_lamport_id_and_point_type_and_description(
+        &self,
+        lamport_id: &str,
+        point_type: &str,
+        description: &str,
+    ) -> AppResult<i64> {
+        self.get_points_by_lamportid_pointtype_description(lamport_id, point_type, description).await
+    }
+
+    pub async fn get_count_points_by_lamport_id_and_point_type_and_description(
+        &self,
+        lamport_id: &str,
+        point_type: &str,
+        description: &str,
+    ) -> AppResult<i64> {
+        self.get_count_points_by_lamportid_pointtype_description(lamport_id, point_type, description).await
     }
 }

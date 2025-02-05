@@ -15,6 +15,10 @@ pub const POINTS_INVITE_VALUE: i32 = 100;
 pub const POINTS_VOTE_VALUE: i32 = 10;
 pub const POINTS_BINDING_VALUE: i32 = 100;
 
+pub const INVITE_TWITTER_CHANNEL: &str = "twitter";
+pub const INVITE_TELEGRAM_CHANNEL: &str = "telegram";
+pub const INVITE_OTHERS_CHANNEL: &str = "others";
+
 pub const ENERGY_PROPOSAL: &str = "proposal";
 pub const ENERGY_VOTE: &str = "vote";
 pub const ENERGY_REGISTER: &str = "register";
@@ -42,3 +46,5 @@ pub const EVENT_TYPE_INVITE: &str = "invite";
 pub const EVENT_TYPE_BINDING: &str = "binding";
 pub const EVENT_TYPE_REGISTER: &str = "register";
 pub const EVENT_TYPE_JOIN: &str = "join";
+
+pub const TWITTER_SERVICE_URL: &str = "http://213.136.84.124:5000";

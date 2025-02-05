@@ -1,6 +1,6 @@
 use oauth2::CsrfToken;
 use redis::AsyncCommands;
-use serde::{Serialize, Deserialize};
+use serde::Serialize;
 use crate::common::error::{AppResult, AppError};
 
 pub fn gen_csrf_token() -> String {

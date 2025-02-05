@@ -1,12 +1,20 @@
 use super::user_message::*;
-use crate::{app::SharedState, common::error::{AppResult, AppError}, server::middlewares::AuthToken};
+use crate::{
+    app::SharedState, 
+    common::{
+        error::{AppResult, AppError}, 
+        consts
+    },
+    server::{
+        middlewares::AuthToken,
+        auth::auth_message::*
+    },
+    database::services::binding,
+    nostr,
+};
 use axum::{debug_handler, extract::State, Json};
-use crate::server::auth::{auth_message::*};
-use reqwest::Client;
-use crate::common::consts;
 use serde::{Deserialize, Serialize};
-use crate::database::entities::twitter_binding;
-use crate::nostr;
+use reqwest::Client;
 
 #[debug_handler]
 pub async fn get_user_info(
@@ -163,7 +171,7 @@ pub async fn binding_account(
     tracing::info!("[auth_token] get user info: {:?}", user_info);
 
 
-    let created_binding= match state.store.binding_twitter(
+    let binding  = binding::TwitterBinding::new(
         claim.sub.clone(),
         user_info.data.id.clone(),
         user_info.data.name.clone(),
@@ -173,7 +181,9 @@ pub async fn binding_account(
         token.refresh_token.clone(),
         token.token_type.clone(),
         token.scope.clone(),
-    ).await {
+    );
+
+    let created_binding= match state.store.binding_twitter(&binding).await {
         Ok(u) => u,
         Err(AppError::UserExisted(_)) => {
             tracing::info!("user has already existed, log in");
@@ -223,8 +233,8 @@ pub struct BindingTwitterResponse {
     pub image_url: String,
 }
 
-impl From<twitter_binding::Model> for BindingTwitterResponse {
-    fn from(binding: twitter_binding::Model) -> Self {
+impl From<binding::TwitterBinding> for BindingTwitterResponse {
+    fn from(binding: binding::TwitterBinding) -> Self {
         Self {
             x_id: binding.x_id,
             name: binding.name,

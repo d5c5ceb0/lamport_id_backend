@@ -29,7 +29,9 @@ pub struct AppState {
 impl AppState {
     pub async fn new(path: PathBuf) -> Self {
         let config = Config::load_config(path).unwrap();
-        let store = database::Storage::new(config.database.clone()).await;
+        let redis_client = redis::Client::open(config.redis.redis_url.as_str()).unwrap();
+
+        let store = database::Storage::new(config.database.clone(), redis_client.clone()).await;
 
         let secret = consts::JWT_SECRET_KEY.to_string();
         let jwt_handler = jwt_handler::JwtHandler { secret };
@@ -39,7 +41,7 @@ impl AppState {
             store,
             jwt_handler,
             oauth: google_auth::oauth_client(config.auth),
-            redis: redis::Client::open(config.redis.redis_url.as_str()).unwrap(),
+            redis: redis_client,
             queue: RedisStreamPool::new(config.redis.redis_url.as_str())
                 .await
                 .unwrap(),

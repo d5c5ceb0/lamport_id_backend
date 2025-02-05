@@ -21,6 +21,7 @@ pub struct Model {
     #[sea_orm(unique)]
     pub invite_code: String,
     pub invited_by: Option<String>,
+    pub invited_channel: Option<String>,
     pub created_at: Option<DateTimeWithTimeZone>,
     pub updated_at: Option<DateTimeWithTimeZone>,
 }

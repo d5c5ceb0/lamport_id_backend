@@ -89,10 +89,10 @@ pub async fn register(
         let user: User = User::from(user_info.clone());
 
         //points
-        let user = match req.invited_by {
-            Some(invited) => user.add_invited_by(invited.as_str()),
-            None => user,
-        };
+        //let user = match req.invited_by {
+        //    Some(invited) => user.add_invited_by(invited.as_str()),
+        //    None => user,
+        //};
 
         let created_user = match state.store.create_user(user.into()).await {
             Ok(u) => u,
@@ -117,7 +117,7 @@ pub async fn register(
             //award point
             state
                 .store
-                .award_points(inviter.lamport_id.clone(), consts::POINTS_INVITE, consts::POINTS_INVITE_VALUE, "invite reward")
+                .award_points(inviter.lamport_id.clone(), consts::POINTS_INVITE, consts::POINTS_INVITE_VALUE, consts::INVITE_TWITTER_CHANNEL)
                 .await?;
 
             //consume energy 

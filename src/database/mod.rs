@@ -1,18 +1,20 @@
 pub mod entities;
 pub mod migration;
 pub mod services;
+pub mod dals;
 
 use crate::common::{config::DatabaseConfig, error::AppResult};
 use sea_orm::*;
 use std::{sync::Arc, time::Duration};
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct Storage {
     pub conn: Arc<DatabaseConnection>,
+    pub redis: redis::Client,
 }
 
 impl Storage {
-    pub async fn new(config: DatabaseConfig) -> Self {
+    pub async fn new(config: DatabaseConfig, redis: redis::Client) -> Self {
         let mut opt = ConnectOptions::new(&config.db_url);
         opt.max_connections(config.max_connect_pool)
             .min_connections(config.min_connect_pool)
@@ -23,7 +25,7 @@ impl Storage {
             .await
             .expect("failed to connect to database");
 
-        Self { conn: Arc::new(db) }
+        Self { conn: Arc::new(db), redis }
     }
 }
 

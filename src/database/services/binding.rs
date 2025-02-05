@@ -1,52 +1,73 @@
 use crate::{
-    common::error::{AppError, AppResult},
+    common::error::AppResult,
     database::{
-        entities::{prelude::TwitterBinding, twitter_binding},
+        dals::twitter_binding::*,
         Storage,
     },
+    helpers::redis_cache::*,
 };
-use sea_orm::*;
 
+pub type TwitterBinding = TwitterBindingModel;
+
+const TWITTER_BINDING_KEY : &str = "twitter_binding";
 
 impl Storage {
     //create twitter binding
     pub async fn binding_twitter(
         &self,
-        user_id: String,
-        x_id: String,
-        name: String,
-        user_name: String,
-        image_url: String,
-        access_token: String,
-        refresh_token: String,
-        token_type: String,
-        scope: String,
-    ) -> AppResult<twitter_binding::Model> {
-        let binding : twitter_binding::ActiveModel = twitter_binding::ActiveModel {
-            user_id : Set(user_id),
-            x_id : Set(x_id),
-            name : Set(name),
-            user_name : Set(user_name),
-            image_url : Set(image_url),
-            access_token : Set(access_token),
-            refresh_token : Set(refresh_token),
-            token_type : Set(token_type),
-            scope : Set(scope),
-            ..Default::default()
-        };
+        binding: &TwitterBinding,
+    ) -> AppResult<TwitterBinding> {
+        let cache = RedisClient::from(self.redis.clone());
 
-        Ok(binding.insert(self.conn.as_ref()).await?)
+        let binding = self.create_twitter_binding(binding.clone()).await?;
+
+        cache.invalidate_cache(format!("{}:{}", TWITTER_BINDING_KEY, binding.lamport_id).as_str()).await?;
+
+        Ok(binding)
     }
 
+    pub async fn update_twitter_stats(
+        &self,
+        lamport_id: &str,
+        retweet: i32,
+        mention: i32,
+        comment: i32,
+        quote: i32,
+    ) -> AppResult<TwitterBinding> {
+        let cache = RedisClient::from(self.redis.clone());
+
+        let binding = self.update_twitter_binding_by_lamport_id(
+            lamport_id,
+            retweet,
+            mention,
+            comment,
+            quote,
+        ).await?;
+
+        cache.invalidate_cache(format!("{}:{}", TWITTER_BINDING_KEY, binding.lamport_id).as_str()).await?;
+
+        Ok(binding)
+    }
+
+
+
     //get twitter binding by user id
-    pub async fn get_twitter_binding_by_user_id(&self, user_id: &str) -> AppResult<twitter_binding::Model> {
-        match TwitterBinding::find()
-            .filter(twitter_binding::Column::UserId.eq(user_id))
-            .one(self.conn.as_ref())
-            .await? {
-                Some(binding) => Ok(binding),
-                None => Err(AppError::CustomError("Twitter binding has not existed".to_string())),
-            }
+    pub async fn get_twitter_binding_by_user_id(&self, user_id: &str) -> AppResult<TwitterBinding> {
+        let cache = RedisClient::from(self.redis.clone());
+
+
+        let key = format!("{}:{}", TWITTER_BINDING_KEY, user_id);
+
+        if let Ok(data) = cache.get_data(&key).await {
+            tracing::info!("get data from cache:{:?}", data);
+            return Ok(data);
+        }
+
+        let binding= self.get_twitter_binding_by_lamport_id(user_id).await?;
+
+        cache.set_data(&key, &binding).await?;
+
+        Ok(binding)
     }
 
 }

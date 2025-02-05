@@ -18,7 +18,8 @@ impl MigrationTrait for Migration {
                             .auto_increment()
                             .primary_key(),
                     )
-                    .col(ColumnDef::new(TwitterBinding::UserId).string().not_null())
+                    .col(ColumnDef::new(TwitterBinding::Uid).string().unique_key().not_null())
+                    .col(ColumnDef::new(TwitterBinding::LamportId).string().not_null().unique_key())
                     .col(ColumnDef::new(TwitterBinding::XId).string().not_null().unique_key())
                     .col(ColumnDef::new(TwitterBinding::Name).string().not_null())
                     .col(ColumnDef::new(TwitterBinding::UserName).string().not_null().unique_key())
@@ -27,6 +28,12 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(TwitterBinding::RefreshToken).string().not_null())
                     .col(ColumnDef::new(TwitterBinding::TokenType).string().not_null())
                     .col(ColumnDef::new(TwitterBinding::Scope).string().not_null())
+                    .col(ColumnDef::new(TwitterBinding::Retweet).integer().not_null().default(0))
+                    .col(ColumnDef::new(TwitterBinding::Mention).integer().not_null().default(0))
+                    .col(ColumnDef::new(TwitterBinding::Comment).integer().not_null().default(0))
+                    .col(ColumnDef::new(TwitterBinding::Quote).integer().not_null().default(0))
+                    .col(ColumnDef::new(TwitterBinding::UpdatedAt).timestamp_with_time_zone().not_null())
+                    .col(ColumnDef::new(TwitterBinding::CreatedAt).timestamp_with_time_zone().not_null())
                     .to_owned(),
             )
             .await
@@ -43,7 +50,8 @@ impl MigrationTrait for Migration {
 enum TwitterBinding {
     Table,
     Id,
-    UserId,  //lamport_id
+    Uid,
+    LamportId,
     XId,
     UserName,
     Name,
@@ -52,4 +60,10 @@ enum TwitterBinding {
     RefreshToken,
     TokenType,
     Scope,
+    Retweet,
+    Quote,
+    Mention,
+    Comment,
+    UpdatedAt,
+    CreatedAt,
 }

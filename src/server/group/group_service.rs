@@ -5,10 +5,10 @@ use crate::{
     app::SharedState,
     server::{
         vote::vote_service::{
-            count_votes_by_group_id,
-            count_voters_by_group_id,
+            //count_votes_by_group_id,
+            //count_voters_by_group_id,
         },
-        proposal::proposal_service::count_proposals_by_groupid,
+        //proposal::proposal_service::count_proposals_by_groupid,
     }
 };
 

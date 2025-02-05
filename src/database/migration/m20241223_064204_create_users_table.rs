@@ -34,6 +34,7 @@ impl MigrationTrait for Migration {
                             .unique_key(),
                     )
                     .col(ColumnDef::new(Users::InvitedBy).string().null())
+                    .col(ColumnDef::new(Users::InvitedChannel).string().null())
                     .col(
                         ColumnDef::new(Users::CreatedAt)
                             .timestamp_with_time_zone()
@@ -71,6 +72,7 @@ pub enum Users {
     VerifiedBy,
     InvitedBy,
     InviteCode,
+    InvitedChannel,
     CreatedAt,
     UpdatedAt,
 }

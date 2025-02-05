@@ -29,6 +29,7 @@ pub struct User {
     pub email: String,
     pub verified: bool,
     pub invited_by: Option<String>,
+    pub invited_channel: Option<String>,
     pub invite_code: String,
 }
 
@@ -44,6 +45,7 @@ impl From<OauthUserInfo> for User {
             email: "".to_string(),
             verified: false,
             invited_by: None,
+            invited_channel: None,
             invite_code: user_service::gen_invite_code(8),
         }
     }
@@ -70,6 +72,7 @@ impl Into<users::ActiveModel> for User {
             verified: Set(self.verified),
             verified_by: Set(None),
             invited_by: Set(self.invited_by),
+            invited_channel: Set(self.invited_channel),
             invite_code: Set(self.invite_code),
             created_at: Set(Some(chrono::Utc::now().into())),
             updated_at: Set(Some(chrono::Utc::now().into())),
