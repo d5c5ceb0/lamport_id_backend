@@ -275,55 +275,18 @@ pub async fn user_binding_twitter(
         ("code_verifier", "challenge".into()),
     ];
 
-    let token_response=Client::new()
-        .post(TWITTER_AUTH_ENDPOINT)
-        .header("Content-Type", "application/x-www-form-urlencoded")
-        .form(&token_params)
-        .send()
-        .await
-        .map_err(|_e| AppError::RequestError("failed to exchange code".to_string()))?;
+    tracing::info!("[auth_token] exchange code: {:?}", token_params);
 
-    if !token_response.status().is_success() {
-        let error_message = token_response
-            .text()
-            .await
-            .unwrap_or_else(|_| "Failed to read error response".to_string());
 
-        return Err(AppError::RequestError(format!(
-                    "Failed to get token. Status: Error: {}", 
-                    error_message
-        )));
-    }
-
-    let token: ExchangeTokenRespose = token_response
-        .json()
-        .await
-        .map_err(|e| AppError::CustomError(e.to_string() + "Failed to parse user info"))?;
+    let token: ExchangeTokenRespose = OauthRequest::new().exchange_code(TWITTER_AUTH_ENDPOINT, token_params.to_vec(), Some(vec![("Content-Type", "application/x-www-form-urlencoded")]), None).await?;
 
     tracing::info!("[auth_token] exchange code get: {:?}", token);
 
     let access_token = token.access_token.clone();
 
-    let user_info_response = Client::new()
-        .get(TWITTER_API_ENDPOINT)
-        .bearer_auth(&access_token)
-        .query(&[("user.fields", "profile_image_url")])
-        .send()
-        .await
-        .map_err(|_e| AppError::RequestError("failed to get user info".to_string()))?;
-
-    tracing::info!("[auth_token] get user info response: {:?}", user_info_response);
-
-    if !user_info_response.status().is_success() {
-        return Err(AppError::RequestError(
-            "non user info in response".to_string(),
-        ));
-    }
-
-    let user_info: OauthUserInfo = user_info_response
-        .json()
-        .await
-        .map_err(|e| AppError::CustomError(e.to_string() + "Failed to parse user info"))?;
+    let user_info: OauthUserInfo = OauthRequest::new()
+        .get_user_info(TWITTER_API_ENDPOINT, &access_token, None, Some(vec![("user.fields", "profile_image_url")]))
+        .await?;
 
     tracing::info!("[auth_token] get user info: {:?}", user_info);
 
@@ -453,59 +416,16 @@ pub async fn user_binding_discord(
         ("redirect_uri", params.clone().redirect_uri.unwrap()),
     ];
 
-    let token_response= Client::new()
-        .post(DISCORD_AUTH_ENDPOINT)
-        .header("Content-Type", "application/x-www-form-urlencoded")
-        .basic_auth(DISCORD_CLIENT_ID, Some(DISCORD_CLIENT_SECRET))
-        .form(&token_params)
-        .send()
-        .await
-        .map_err(|_e| AppError::RequestError("failed to exchange code".to_string()))?;
-
-    if !token_response.status().is_success() {
-        let error_message = token_response
-            .text()
-            .await
-            .unwrap_or_else(|_| "Failed to read error response".to_string());
-
-        return Err(AppError::RequestError(format!(
-                    "Failed to get token. Status: Error: {}", 
-                    error_message
-        )));
-    }
-
-    let token: TokenResponse = token_response
-        .json()
-        .await
-        .map_err(|e| AppError::CustomError(e.to_string() + "Failed to parse user info"))?;
+    let token: TokenResponse = OauthRequest::new()
+        .exchange_code(DISCORD_AUTH_ENDPOINT, token_params.to_vec(), Some(vec![("Content-Type", "application/x-www-form-urlencoded")]), Some((DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET)))
+        .await?;
 
     tracing::info!("[auth_token] exchange code get: {:?}", token);
 
     let access_token = token.access_token.clone();
-    let user_info_response = Client::new()
-        .get(DISCORD_API_ENDPOINT)
-        .bearer_auth(&access_token)
-        .send()
-        .await
-        .map_err(|_e| AppError::RequestError("failed to get user info".to_string()))?;
-
-    tracing::info!("[auth_token] get user info response: {:?}", user_info_response);
-
-    if !user_info_response.status().is_success() {
-        let error_message =user_info_response 
-            .text()
-            .await
-            .unwrap_or_else(|_| "Failed to read error response".to_string());
-        tracing::error!("[auth_token] get user error: {:?}", error_message);
-        return Err(AppError::RequestError(
-            "non user info in response".to_string(),
-        ));
-    }
-
-    let user_info: OauthDiscordInfo = user_info_response
-        .json()
-        .await
-        .map_err(|e| AppError::CustomError(e.to_string() + "Failed to parse user info"))?;
+    let user_info: OauthDiscordInfo = OauthRequest::new()
+        .get_user_info(DISCORD_API_ENDPOINT, &access_token, None, None)
+        .await?;
 
     tracing::info!("[auth_token] get user info: {:?}", user_info);
 
@@ -525,60 +445,130 @@ pub async fn user_binding_github(
         ("client_secret", GITHUB_CLIENT_SECRET.into()),
     ];
 
-    let token_response= Client::new()
-        .post(GITHUB_TOKEN_URL)
-        .header("Accept", "application/json")
-        .form(&token_params)
-        .send()
-        .await
-        .map_err(|_e| AppError::RequestError("failed to exchange code".to_string()))?;
-
-    if !token_response.status().is_success() {
-        let error_message = token_response
-            .text()
-            .await
-            .unwrap_or_else(|_| "Failed to read error response".to_string());
-
-        return Err(AppError::RequestError(format!(
-                    "Failed to get token. Status: Error: {}", 
-                    error_message
-        )));
-    }
-
-    let token: TokenResponse = token_response
-        .json()
-        .await
-        .map_err(|e| AppError::CustomError(e.to_string() + "Failed to parse user info"))?;
+    let token :TokenResponse = OauthRequest::new()
+        .exchange_code(GITHUB_TOKEN_URL, token_params.to_vec(), Some(vec![("Accept", "application/json")]), None)
+        .await?;
 
     tracing::info!("[auth_token] exchange code get: {:?}", token);
 
     let access_token = token.access_token.clone();
 
-    let response = Client::new()
-        .get(GITHUB_API_URL)
-        .header("Authorization", format!("Bearer {}", access_token))
-        .header("User-Agent", "lamportid")
-        .send()
-        .await
-        .map_err(|_e| AppError::RequestError("failed to get user info".to_string()))?;
-
-    if !response.status().is_success() {
-        let error_message =response 
-            .text()
-            .await
-            .unwrap_or_else(|_| "Failed to read error response".to_string());
-        tracing::error!("[auth_token] get user error: {:?}", error_message);
-        return Err(AppError::RequestError(
-            "non user info in response".to_string(),
-        ));
-    }
-
-    let user_info: GitHubUser = response
-        .json()
-        .await
-        .map_err(|e| AppError::CustomError(e.to_string() + "Failed to parse user info"))?;
+    let user_info: GitHubUser = OauthRequest::new()
+        .get_user_info(GITHUB_API_URL, &access_token, Some(vec![("User-Agent","lamportid")]), None)
+        .await?;
+    tracing::info!("[auth_token] get user info: {:?}", user_info);
 
     Ok(user_info)
 }
 
 
+
+#[derive(Debug)]
+pub struct OauthRequest(reqwest::Client);
+
+impl Default for OauthRequest {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl OauthRequest {
+    pub fn new() -> Self {
+        OauthRequest(reqwest::Client::new())
+    }
+
+    pub async fn get_user_info<T>(
+        &self, 
+        url: &str,
+        access_token: &str,
+        //user_agent: Option<String>,
+        header_fields: Option<Vec<(&str, &str)>>,
+        query_fields: Option<Vec<(&str, &str)>>
+    ) -> AppResult<T> 
+    where
+        T: for<'de> serde::Deserialize<'de> 
+    {
+        let mut request= Client::new()
+            .get(url)
+            .bearer_auth(access_token);
+
+        if let Some(fields) = query_fields {
+            request = request.query(&fields);
+        }
+
+        if let Some(fields) = header_fields {
+            for (k, v) in fields {
+                request = request.header(k, v);
+            }
+        }
+
+
+        let response = request.send().await.map_err(|_e| AppError::RequestError("failed to get user info".to_string()))?;
+
+        if !response.status().is_success() {
+            tracing::error!(" get user error");
+            return Err(AppError::RequestError(
+                    "non user info in response".to_string(),
+            ));
+        }
+
+        let user_info: T = response
+            .json()
+            .await
+            .map_err(|e| AppError::CustomError(e.to_string() + "Failed to parse user info"))?;
+
+
+        Ok(user_info)
+    }
+
+    //.header("Content-Type", "application/x-www-form-urlencoded")
+    //.header("Accept", "application/json")
+    //.basic_auth(DISCORD_CLIENT_ID, Some(DISCORD_CLIENT_SECRET))
+    pub async fn exchange_code<T>(
+        &self, 
+        url: &str,
+        params: Vec<(&str, String)>,
+        header_fields: Option<Vec<(&str, &str)>>,
+        basci_auth: Option<(&str, &str)>
+    ) -> AppResult<T> 
+    where
+        T: for<'de> serde::Deserialize<'de> 
+    {
+        let mut request= self.0
+            .post(url);
+
+        if let Some(fields) = header_fields {
+            for (k, v) in fields {
+                request = request.header(k, v);
+            }
+        }
+
+        if let Some((k, v)) = basci_auth {
+            request = request.basic_auth(k, Some(v));
+        }
+
+        let response = request.form(&params).send()
+            .await
+            .map_err(|_e| AppError::RequestError("failed to exchange code".to_string()))?;
+
+
+        if !response.status().is_success() {
+            let error_message = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Failed to read error response".to_string());
+
+            return Err(AppError::RequestError(format!(
+                        "Failed to get token. Status: Error: {}", 
+                        error_message
+            )));
+        }
+
+        let token: T = response
+            .json()
+            .await
+            .map_err(|e| AppError::CustomError(e.to_string() + "Failed to parse user info"))?;
+
+        Ok(token)
+    }
+}
