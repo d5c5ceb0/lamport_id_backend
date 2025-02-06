@@ -40,3 +40,14 @@ pub async fn auth_get_nonce(
     Ok(token)
 }
 
+pub async fn auth_get_tg_token(
+    state: &SharedState,
+    lamport_id: String,
+) -> AppResult<String> {
+    let redis_client = RedisClient::from(state.redis.clone());
+    let token = redis_client.cache_lamportid_token(lamport_id.as_str()).await?;
+    tracing::info!("gen nonce: {}-{:?}", token, lamport_id);
+
+    Ok(token)
+}
+

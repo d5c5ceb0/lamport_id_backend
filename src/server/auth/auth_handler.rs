@@ -3,6 +3,7 @@ use super::auth_service::*;
 use crate::{
     app::SharedState,
     common::error::AppResult,
+    server::middlewares::AuthToken,
 };
 use axum::{
     debug_handler,
@@ -52,4 +53,22 @@ pub async fn get_nonce(
         }
     })))
 }
+
+#[debug_handler]
+pub async fn get_tg_token(
+    State(state): State<SharedState>,
+    AuthToken(user): AuthToken,
+) -> AppResult<Json<serde_json::Value>> {
+    let client = state.jwt_handler.clone();
+    let claim = client.decode_token(user).unwrap();
+
+    let token= auth_get_tg_token(&state, claim.sub).await?;
+
+    Ok(Json(serde_json::json!({
+        "result": {
+            "tg_token": token
+        }
+    })))
+}
+
 

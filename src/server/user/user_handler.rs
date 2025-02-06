@@ -297,25 +297,21 @@ impl From<telegram_binding::TelegramBindingModel> for BindingTelegramResponse {
 
 pub async fn binding_telegram(
     State(state): State<SharedState>,
-    AuthToken(user): AuthToken,
     Json(params): Json<TelegramParams>,
 ) -> AppResult<Json<serde_json::Value>> {
-    let client = state.jwt_handler.clone();
-    let claim = client.decode_token(user).unwrap();
-
-
     let redis_client = RedisClient::from(state.redis.clone());
 
-    if let Ok(token) = redis_client.get_csrf_token(params.token.as_str()).await {
+    let lamport_id = if let Ok(token) = redis_client.get_lamportid_token(params.token.as_str()).await {
         tracing::info!("got token: {:?} by key: {:?}", token, params.token);
+        token
     } else {
         tracing::error!("got token err: wrong token:{:?} ", params.token);
         return Err(AppError::InputValidateError(
                 "token is not existing".into(),
         ));
-    }
+    };
 
-    match redis_client.del_csrf_token(params.token.as_str()).await {
+    match redis_client.del_lamportid_token(params.token.as_str()).await {
         Ok(_) => {
             tracing::info!("delete token success");
         }
@@ -325,21 +321,30 @@ pub async fn binding_telegram(
     }
 
     //save to db
-    let binding = state.store.create_telegram_binding(telegram_binding::TelegramBindingModel::new(
-        claim.sub.clone(),
+    let binding = match state.store.create_telegram_binding(telegram_binding::TelegramBindingModel::new(
+        lamport_id.clone(),
         params.user_id.clone(),
-    )).await?;
+    )).await {
+        Ok(u) => u,
+        Err(e) => {
+            tracing::error!("user has already existed, {:?}", e);
+            state
+                .store
+                .get_telegram_binding_by_lamport_id(lamport_id.as_str())
+                .await?
+        },
+    };
 
     //award point
     state
         .store
-        .award_points(claim.sub.clone(), consts::POINTS_BINDING, consts::POINTS_BINDING_VALUE, "telegram")
+        .award_points(lamport_id.clone(), consts::POINTS_BINDING, consts::POINTS_BINDING_VALUE, "telegram")
         .await?;
 
     //consume energy 
     state
         .store
-        .create_energy(claim.sub.clone(), consts::ENERGY_BINDING, consts::ENERGY_BINDING_VALUE)
+        .create_energy(lamport_id.clone(), consts::ENERGY_BINDING, consts::ENERGY_BINDING_VALUE)
         .await?;
 
     Ok(Json(serde_json::json!({
@@ -351,7 +356,7 @@ const API_ENDPOINT: &str = "https://discord.com/api/v10";
 const CLIENT_ID: &str = "1336590096928866306";
 const CLIENT_SECRET: &str = "5DcNW65ua3Av76eQuCn0wdDz4PErna2F";
 
-#[derive(Deserialize, Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct TokenResponse {
     access_token: String,
     token_type: String,
@@ -359,7 +364,7 @@ pub struct TokenResponse {
     refresh_token: String,
     scope: String,
 }
-//{\"id\":\"1142062260328603648\",\"username\":\"energetic_dove_64259\",\"avatar\":null,\"discriminator\":\"0\",\"public_flags\":0,\"flags\":0,\"banner\":null,\"accent_color\":null,\"global_name\":\"aa\",\"avatar_decoration_data\":null,\"banner_color\":null,\"clan\":null,\"primary_guild\":null,\"mfa_enabled\":false,\"locale\":\"zh-CN\",\"premium_type\":0,\"email\":\"d5c5ceb0@gmail.com\",\"verified\":true}\
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct OauthDiscordInfo {
     pub id: String,
