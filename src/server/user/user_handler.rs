@@ -1,23 +1,14 @@
 use super::user_message::*;
+use super::user_service::*;
 use crate::{
     app::SharedState, 
-    common::{
-        error::{AppResult, AppError}, 
-        consts
-    },
+    common::error::{AppResult, AppError}, 
     server::{
         middlewares::AuthToken,
         auth::auth_message::*,
-        events::events_message::Event
     },
-    database::dals::telegram_binding,
-    database::services::binding,
-    nostr,
-    helpers::{eip191::verify_signature, redis_cache::*},
 };
 use axum::{debug_handler, extract::State, extract::Path, extract::Json as EJson,Json};
-use serde::{Deserialize, Serialize};
-use reqwest::Client;
 
 #[debug_handler]
 pub async fn get_user_info(
@@ -27,20 +18,21 @@ pub async fn get_user_info(
     let client = state.jwt_handler.clone();
     let claim = client.decode_token(user).unwrap();
 
-    let user = state.store.get_user_by_uid(claim.sub.as_ref()).await?;
-    let user_rep = UserResponse::from(user);
+    let resp = user_get_user_info(&state, claim.sub.as_str()).await?;
+    tracing::info!("get user info: {:?}", resp);
 
     Ok(Json(serde_json::json!({
-    "result": user_rep
+    "result": resp
     })))
 }
 
 #[debug_handler]
 pub async fn get_user_count(
     State(state): State<SharedState>,
-    AuthToken(_user): AuthToken,
 ) -> AppResult<Json<serde_json::Value>> {
-    let count = state.store.count_total_users().await?;
+    let count = user_get_user_count(&state).await?;
+
+    tracing::info!("get user count: {:?}", count);
 
     Ok(Json(serde_json::json!({
     "result": CountResponse{count}
@@ -55,36 +47,81 @@ pub async fn get_user_stats(
     let client = state.jwt_handler.clone();
     let claim = client.decode_token(user).unwrap();
 
-    let invite_count = state
-        .store
-        .count_invited_users_by_uid(claim.sub.as_ref())
-        .await?;
-
-    tracing::info!("sub: {:?}", claim.sub);
-    let point = match state.store.get_user_points(claim.sub.as_ref()).await {
-        Ok(v) => v as u64,
-        Err(e) => return Err(e),
-    };
-
-    let energy = match state.store.get_user_power(claim.sub.as_ref()).await {
-        Ok(v) => v as u64,
-        Err(e) => return Err(e),
-    };
-
-    //pub async fn get_user_daily_points(&self, user_uid: &str) -> AppResult<i64> {
-    let daily_point = match state.store.get_user_daily_points(claim.sub.as_ref()).await {
-        Ok(v) => v as u64,
-        Err(e) => return Err(e),
-    };
+    let resp = user_get_user_stats(&state, claim.sub.as_str()).await?;
 
     Ok(Json(serde_json::json!({
-    "result": PointsResponse{point, invite_count, energy, daily_point}
+    "result": resp
     })))
 }
 
-// post binding_account
+//check username
 #[debug_handler]
-pub async fn binding_account(
+pub async fn check_username(
+    State(state): State<SharedState>,
+    Path(username): Path<String>,
+) -> AppResult<Json<serde_json::Value>> {
+    tracing::info!("check username: {:?}", username);
+    match user_check_username(&state, username.as_str()).await {
+        Ok(_) => Ok(Json(serde_json::json!({
+            "result": "OK"
+        })),
+        ),
+        Err(e) => Err(e),
+    }
+}
+
+#[debug_handler]
+pub async fn verify_user(
+    State(state): State<SharedState>,
+    AuthToken(user): AuthToken,
+    Path(address): Path<String>,
+) -> AppResult<Json<serde_json::Value>> {
+    let client = state.jwt_handler.clone();
+    let claim = client.decode_token(user).unwrap();
+    
+    user_verify_user(&state, claim.sub.as_str(), address.as_str()).await?;
+
+    Ok(Json(serde_json::json!({
+        "result": {
+            "status": "success",
+            "address": address
+        }
+    })))
+}
+
+#[debug_handler]
+pub async fn login(
+    State(state): State<SharedState>,
+    EJson(req): EJson<LoginRequest>,
+) -> AppResult<Json<serde_json::Value>> {
+
+    let (token, user) = user_login(&state, req).await?;
+
+    Ok(Json(serde_json::json!({
+        "result": {
+            "access_token": token,
+            "user_info": user
+        }
+    })))
+}
+
+#[debug_handler]
+pub async fn register(
+    State(state): State<SharedState>,
+    EJson(req): EJson<RegisterRequest>,
+) -> AppResult<Json<serde_json::Value>> {
+    let (token, user) = user_register(&state, req).await?;
+
+    Ok(Json(serde_json::json!({
+        "result": {
+            "access_token": token,
+            "user_info": user
+        }
+    })))
+}
+
+#[debug_handler]
+pub async fn binding_twitter(
     State(state): State<SharedState>,
     AuthToken(user): AuthToken,
     Json(params): Json<OAuthParams>,
@@ -92,163 +129,20 @@ pub async fn binding_account(
     let client = state.jwt_handler.clone();
     let claim = client.decode_token(user).unwrap();
 
-    if let Ok(t) = state.store.get_twitter_binding_by_user_id(claim.sub.as_str()).await {
-        return Ok(Json(serde_json::json!({
-            "result": {
-                "twitter_info": BindingTwitterResponse::from(t)
-            }
-        })));
-    }
-
     tracing::info!("[auth_token] get params: {:?}", params);
 
     params.validate_items()?;
 
-    let client = Client::new();
+    let resp = user_binding_twitter(&state, claim.sub, params.clone()).await?;
 
-    let token_params = [
-        ("code", params.clone().code.unwrap()),
-        ("grant_type", "authorization_code".into()),
-        ("client_id", state.config.auth.client_id.clone()),
-        ("redirect_uri", params.clone().redirect_uri.unwrap()),
-        ("code_verifier", "challenge".into()),
-    ];
-
-    tracing::info!("[auth_token] exchange code params: {:?}", token_params);
-
-
-    let token_response= client
-        .post("https://api.x.com/2/oauth2/token")
-        .header("Content-Type", "application/x-www-form-urlencoded")
-        .form(&token_params)
-        .send()
-        .await
-        .map_err(|_e| AppError::RequestError("failed to exchange code".to_string()))?;
-
-    if !token_response.status().is_success() {
-        let error_message = token_response
-            .text()
-            .await
-            .unwrap_or_else(|_| "Failed to read error response".to_string());
-
-        return Err(AppError::RequestError(format!(
-                    "Failed to get token. Status: Error: {}", 
-                    error_message
-        )));
-    }
-
-    let token: ExchangeTokenRespose = token_response
-        .json()
-        .await
-        .map_err(|e| AppError::CustomError(e.to_string() + "Failed to parse user info"))?;
-
-    tracing::info!("[auth_token] exchange code get: {:?}", token);
-
-    let access_token = token.access_token.clone();
-
-    tracing::info!("[auth_token] Access Token: {:?}", access_token);
-
-    let client = Client::new();
-
-    let user_info_response = client
-        .get("https://api.x.com/2/users/me")
-        .bearer_auth(&access_token)
-        .query(&[("user.fields", "profile_image_url")])
-        .send()
-        .await
-        .map_err(|_e| AppError::RequestError("failed to get user info".to_string()))?;
-
-    tracing::info!("[auth_token] get user info response: {:?}", user_info_response);
-
-    if !user_info_response.status().is_success() {
-        return Err(AppError::RequestError(
-            "non user info in response".to_string(),
-        ));
-    }
-
-    let user_info: OauthUserInfo = user_info_response
-        .json()
-        .await
-        .map_err(|e| AppError::CustomError(e.to_string() + "Failed to parse user info"))?;
-
-    tracing::info!("[auth_token] get user info: {:?}", user_info);
-
-
-    let binding  = binding::TwitterBinding::new(
-        claim.sub.clone(),
-        user_info.data.id.clone(),
-        user_info.data.name.clone(),
-        user_info.data.username.clone(),
-        user_info.data.profile_image_url.clone(),
-        token.access_token.clone(),
-        token.refresh_token.clone(),
-        token.token_type.clone(),
-        token.scope.clone(),
-    );
-
-    let created_binding= match state.store.binding_twitter(&binding).await {
-        Ok(u) => u,
-        Err(AppError::UserExisted(_)) => {
-            tracing::info!("user has already existed, log in");
-            state
-                .store
-                .get_twitter_binding_by_user_id(claim.sub.as_str())
-                .await?
-        }
-        Err(e) => return Err(e),
-    };
-
-    //award point
-    state
-        .store
-        .award_points(claim.sub.clone(), consts::POINTS_BINDING, consts::POINTS_BINDING_VALUE, "twitter")
-        .await?;
-
-    //consume energy 
-    state
-        .store
-        .create_energy(claim.sub.clone(), consts::ENERGY_BINDING, consts::ENERGY_BINDING_VALUE)
-        .await?;
-
-
-    tracing::info!("[auth_token] database  user info: {:?}", created_binding);
-
-    //pub fn new_kind2321(pubkey: PublicKey, lamport_id: &str, twitter: &str) -> Self {
-    state.queue.add_queue_req_ex(consts::NOSTR_TOPIC, nostr::LamportBinding::new_kind2321(
-        state.nclient.get_pub_key(),
-        claim.sub.as_str(),
-        created_binding.user_name.as_str(),
-    )).await?;
 
     Ok(Json(serde_json::json!({
         "result": {
-            "twitter_info": BindingTwitterResponse::from(created_binding)
+            "twitter_info": resp
         }
     })))
 }
 
-//struct for get binding twitter and impl from twitter_binding::Model
-#[derive(Debug, Serialize, Deserialize)]
-pub struct BindingTwitterResponse {
-    pub x_id: String,
-    pub name: String,
-    pub user_name: String,
-    pub image_url: String,
-}
-
-impl From<binding::TwitterBinding> for BindingTwitterResponse {
-    fn from(binding: binding::TwitterBinding) -> Self {
-        Self {
-            x_id: binding.x_id,
-            name: binding.name,
-            user_name: binding.user_name,
-            image_url: binding.image_url,
-        }
-    }
-}
-
-
-// get_user_bindings
 #[debug_handler]
 pub async fn get_user_bindings(
     State(state): State<SharedState>,
@@ -257,10 +151,10 @@ pub async fn get_user_bindings(
     let client = state.jwt_handler.clone();
     let claim = client.decode_token(user).unwrap();
 
-    match state.store.get_twitter_binding_by_user_id(claim.sub.as_str()).await {
+    match user_get_twitter_binding(&state, claim.sub.as_str()).await {
         Ok(binding) => Ok(Json(serde_json::json!({
                 "result": {
-                    "twitter_info": BindingTwitterResponse::from(binding)
+                    "twitter_info": binding
                 }
             }))),
         Err(AppError::CustomError(_)) => Ok(Json(serde_json::json!({
@@ -273,119 +167,17 @@ pub async fn get_user_bindings(
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct TelegramParams {
-    pub user_id: String,
-    pub token: String,
-}
-
-//telgram binding response
-#[derive(Debug, Serialize, Deserialize)]
-pub struct BindingTelegramResponse {
-    pub lamport_id: String,
-    pub user_id: String,
-}
-
-impl From<telegram_binding::TelegramBindingModel> for BindingTelegramResponse {
-    fn from(binding: telegram_binding::TelegramBindingModel) -> Self {
-        Self {
-            lamport_id: binding.lamport_id,
-            user_id: binding.telegram_id,
-        }
-    }
-}
-
 pub async fn binding_telegram(
     State(state): State<SharedState>,
     Json(params): Json<TelegramParams>,
 ) -> AppResult<Json<serde_json::Value>> {
-    let redis_client = RedisClient::from(state.redis.clone());
-
-    let lamport_id = if let Ok(token) = redis_client.get_lamportid_token(params.token.as_str()).await {
-        tracing::info!("got token: {:?} by key: {:?}", token, params.token);
-        token
-    } else {
-        tracing::error!("got token err: wrong token:{:?} ", params.token);
-        return Err(AppError::InputValidateError(
-                "token is not existing".into(),
-        ));
-    };
-
-    match redis_client.del_lamportid_token(params.token.as_str()).await {
-        Ok(_) => {
-            tracing::info!("delete token success");
-        }
-        Err(e) => {
-            tracing::error!("delete token err: {:?}", e);
-        }
-    }
-
-    //save to db
-    let binding = match state.store.create_telegram_binding(telegram_binding::TelegramBindingModel::new(
-        lamport_id.clone(),
-        params.user_id.clone(),
-    )).await {
-        Ok(u) => u,
-        Err(e) => {
-            tracing::error!("user has already existed, {:?}", e);
-            state
-                .store
-                .get_telegram_binding_by_lamport_id(lamport_id.as_str())
-                .await?
-        },
-    };
-
-    //award point
-    state
-        .store
-        .award_points(lamport_id.clone(), consts::POINTS_BINDING, consts::POINTS_BINDING_VALUE, "telegram")
-        .await?;
-
-    //consume energy 
-    state
-        .store
-        .create_energy(lamport_id.clone(), consts::ENERGY_BINDING, consts::ENERGY_BINDING_VALUE)
-        .await?;
+    let binding = user_binding_telegram(&state, &params).await?;
 
     Ok(Json(serde_json::json!({
-        "result": BindingTelegramResponse::from(binding)
+        "result": binding
     })))
 }
 
-const API_ENDPOINT: &str = "https://discord.com/api/v10";
-const CLIENT_ID: &str = "1336590096928866306";
-const CLIENT_SECRET: &str = "5DcNW65ua3Av76eQuCn0wdDz4PErna2F";
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct TokenResponse {
-    access_token: String,
-    token_type: String,
-    expires_in: u64,
-    refresh_token: String,
-    scope: String,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct OauthDiscordInfo {
-    pub id: String,
-    pub username: String,
-    pub avatar: Option<String>,
-    pub discriminator: String,
-    pub public_flags: u64,
-    pub flags: u64,
-    pub banner: Option<String>,
-    pub accent_color: Option<String>,
-    pub global_name: String,
-    pub avatar_decoration_data: Option<String>,
-    pub banner_color: Option<String>,
-    pub clan: Option<String>,
-    pub primary_guild: Option<String>,
-    pub mfa_enabled: bool,
-    pub locale: String,
-    pub premium_type: u64,
-    pub email: String,
-    pub verified: bool,
-}
 
 pub async fn binding_discord(
     State(state): State<SharedState>,
@@ -397,99 +189,14 @@ pub async fn binding_discord(
 
     tracing::info!("[auth_token] get params: {:?}", params);
     //if existed TODO
-    //
 
-    let client = Client::new();
-
-    let token_params = [
-        ("code", params.clone().code.unwrap()),
-        ("grant_type", "authorization_code".into()),
-        ("redirect_uri", params.clone().redirect_uri.unwrap()),
-    ];
-
-    tracing::info!("[auth_token] exchange code params: {:?}", token_params);
-
-
-    let token_response= client
-        .post(&format!("{}/oauth2/token", API_ENDPOINT))
-        .header("Content-Type", "application/x-www-form-urlencoded")
-        .basic_auth(CLIENT_ID, Some(CLIENT_SECRET))
-        .form(&token_params)
-        .send()
-        .await
-        .map_err(|_e| AppError::RequestError("failed to exchange code".to_string()))?;
-
-    if !token_response.status().is_success() {
-        let error_message = token_response
-            .text()
-            .await
-            .unwrap_or_else(|_| "Failed to read error response".to_string());
-
-        return Err(AppError::RequestError(format!(
-                    "Failed to get token. Status: Error: {}", 
-                    error_message
-        )));
-    }
-
-    let token: TokenResponse = token_response
-        .json()
-        .await
-        .map_err(|e| AppError::CustomError(e.to_string() + "Failed to parse user info"))?;
-
-    tracing::info!("[auth_token] exchange code get: {:?}", token);
-
-    let access_token = token.access_token.clone();
-
-    tracing::info!("[auth_token] Access Token: {:?}", access_token);
-
-    ///
-    let client = Client::new();
-
-    let user_info_response = client
-        .get("https://discord.com/api/v10/users/@me")
-        .bearer_auth(&access_token)
-        .send()
-        .await
-        .map_err(|_e| AppError::RequestError("failed to get user info".to_string()))?;
-
-    tracing::info!("[auth_token] get user info response: {:?}", user_info_response);
-
-    if !user_info_response.status().is_success() {
-        let error_message =user_info_response 
-            .text()
-            .await
-            .unwrap_or_else(|_| "Failed to read error response".to_string());
-        tracing::error!("[auth_token] get user error: {:?}", error_message);
-        return Err(AppError::RequestError(
-            "non user info in response".to_string(),
-        ));
-    }
-
-    let user_info: OauthDiscordInfo = user_info_response
-        .json()
-        .await
-        .map_err(|e| AppError::CustomError(e.to_string() + "Failed to parse user info"))?;
-
-    tracing::info!("[auth_token] get user info: {:?}", user_info);
-
+    let user_info = user_binding_discord(&state, claim.sub.as_str(), &params).await?;
 
     Ok(Json(serde_json::json!({
         "result": user_info
     })))
 }
 
-
-const GITHUB_CLIENT_ID: &str = "Iv23lii7LrglBj8Q0mvv";
-const GITHUB_CLIENT_SECRET: &str = "7bd3652c28928d26cad5b9aa04ed12c324a86b91";
-const GITHUB_TOKEN_URL: &str = "https://github.com/login/oauth/access_token";
-const GITHUB_API_URL: &str = "https://api.github.com/user";
-
-#[derive(Debug, Serialize, Deserialize)]
-struct GitHubUser {
-    login: String,
-    id: u64,
-    avatar_url: String,
-}
 
 pub async fn binding_github(
     State(state): State<SharedState>,
@@ -501,302 +208,13 @@ pub async fn binding_github(
 
     tracing::info!("[auth_token] get params: {:?}", params);
     //if existed TODO
-    //
 
-    let client = Client::new();
-
-    let token_params = [
-        ("code", params.clone().code.unwrap()),
-        ("client_id", GITHUB_CLIENT_ID.into()),
-        ("client_secret", GITHUB_CLIENT_SECRET.into()),
-    ];
-
-    tracing::info!("[auth_token] exchange code params: {:?}", token_params);
-
-    let token_response= client
-        .post(GITHUB_TOKEN_URL)
-        .header("Accept", "application/json")
-        .form(&token_params)
-        .send()
-        .await
-        .map_err(|_e| AppError::RequestError("failed to exchange code".to_string()))?;
-
-    if !token_response.status().is_success() {
-        let error_message = token_response
-            .text()
-            .await
-            .unwrap_or_else(|_| "Failed to read error response".to_string());
-
-        return Err(AppError::RequestError(format!(
-                    "Failed to get token. Status: Error: {}", 
-                    error_message
-        )));
-    }
-
-    let token: TokenResponse = token_response
-        .json()
-        .await
-        .map_err(|e| AppError::CustomError(e.to_string() + "Failed to parse user info"))?;
-
-    tracing::info!("[auth_token] exchange code get: {:?}", token);
-
-    let access_token = token.access_token.clone();
-
-    tracing::info!("[auth_token] Access Token: {:?}", access_token);
-
-    let client = Client::new();
-    let response = client
-        .get(GITHUB_API_URL)
-        .header("Authorization", format!("Bearer {}", access_token))
-        .header("User-Agent", "lamportid")
-        .send()
-        .await
-        .map_err(|_e| AppError::RequestError("failed to get user info".to_string()))?;
-
-    //let user_info = response.json::<GitHubUser>().await?;
-
-    if !response.status().is_success() {
-        let error_message =response 
-            .text()
-            .await
-            .unwrap_or_else(|_| "Failed to read error response".to_string());
-        tracing::error!("[auth_token] get user error: {:?}", error_message);
-        return Err(AppError::RequestError(
-            "non user info in response".to_string(),
-        ));
-    }
-
-    let user_info: GitHubUser = response
-        .json()
-        .await
-        .map_err(|e| AppError::CustomError(e.to_string() + "Failed to parse user info"))?;
+    let user_info = user_binding_github(&state, claim.sub.as_str(), &params).await?;
 
     Ok(Json(serde_json::json!({
         "result": user_info
     })))
 }
 
-//check username
-#[debug_handler]
-pub async fn check_username(
-    State(state): State<SharedState>,
-    Path(username): Path<String>,
-) -> AppResult<Json<serde_json::Value>> {
-    let existing= state.store.is_user_exists_by_username(&username).await;
-    match existing {
-        Ok(true) => {
-            Err(AppError::ConflictError("Name is already taken".to_string()))
-        }
-        Ok(false) => {
-            Ok(Json(serde_json::json!({
-                "result": "OK"
-            })))
-        }
-        Err(e) => {
-            Err(e)
-        }
-    }
-}
 
-
-// register
-#[debug_handler]
-pub async fn register(
-    State(state): State<SharedState>,
-    EJson(req): EJson<RegisterRequest>,
-) -> AppResult<Json<serde_json::Value>> {
-    if cfg!(not(debug_assertions)) {
-        let verified= verify_signature(&req.data, &req.sig, &req.data.address)?;
-        if !verified {
-            return Err(AppError::InvalidSignature);
-        }
-        tracing::info!("signature verified success");
-
-        let redis_client = RedisClient::from(state.redis.clone());
-
-        if let Ok(nonce) = redis_client.get_nonce(req.data.address.as_str()).await {
-            tracing::info!("got nonce: {:?} by key: {:?}", nonce, req.data.address);
-            if nonce != req.data.nonce {
-                return Err(AppError::InputValidateError("nonce verification error".into()));
-            }
-        } else {
-            tracing::error!("got nonce err: wrong address:{:?} ", req.data.address);
-            return Err(AppError::InputValidateError(
-                    "nonce is not existing".into(),
-            ));
-        }
-
-        match redis_client.del_nonce(req.data.address.as_str()).await {
-            Ok(_) => {
-                tracing::info!("delete nonce success");
-            }
-            Err(e) => {
-                tracing::error!("delete nonce err: {:?}", e);
-            }
-        }
-    }
-
-
-    let user_info: RegisterRequest = req.clone();
-
-    let created_user = if state
-        .store
-        .is_user_exists_by_address(user_info.data.address.as_ref())
-        .await?
-    {
-        state
-            .store
-            .get_user_by_address(user_info.data.address.as_ref())
-            .await?
-    } else {
-        let user: User = User::from(user_info.clone());
-
-        //points
-        //let user = match req.invited_by {
-        //    Some(invited) => user.add_invited_by(invited.as_str()),
-        //    None => user,
-        //};
-
-        let created_user = match state.store.create_user(user.into()).await {
-            Ok(u) => u,
-            Err(AppError::UserExisted(_)) => {
-                tracing::info!("user has already existed, log in");
-                state
-                    .store
-                    .get_user_by_username(user_info.data.user_name.as_ref())
-                    .await?
-            }
-            Err(e) => return Err(e),
-        };
-
-        state
-            .store
-            .create_energy(created_user.clone().lamport_id, consts::ENERGY_REGISTER, consts::ENERGY_REGISTER_VALUE)
-            .await?;
-
-        if let Some(invited_by)  = created_user.invited_by.as_deref() {
-            let inviter = state.store.get_inviter_by_code(invited_by).await?;
-
-            //award point
-            state
-                .store
-                .award_points(inviter.lamport_id.clone(), consts::POINTS_INVITE, consts::POINTS_INVITE_VALUE, consts::INVITE_TWITTER_CHANNEL)
-                .await?;
-
-            //consume energy 
-            state
-                .store
-                .create_energy(inviter.lamport_id, consts::ENERGY_INVITE, consts::ENERGY_INVITE_VALUE)
-                .await?;
-
-        }
-
-        let queue = state.queue.clone();
-
-        let e = Event {
-            event_id: uuid::Uuid::new_v4().to_string(),
-            lamport_id: created_user.lamport_id.clone(),
-            event_type: consts::EVENT_TYPE_REGISTER.to_string(),
-            content: "First time using HetuVerse to generate Lamper ID".to_string(),
-            created_at: chrono::Utc::now(),
-        };
-        queue.add_queue_req_ex(consts::EVENT_TOPIC, e).await?;
-
-        queue.add_queue_req_ex(consts::NOSTR_TOPIC, nostr::LamportBinding::new_kind2322(state.nclient.get_pub_key(),created_user.lamport_id.as_str(), created_user.address.as_str(),"")).await?;
-
-        tracing::info!("[auth_token] database  user info: {:?}", created_user);
-        created_user
-    };
-
-    let secret = state.jwt_handler.clone();
-    let token: String =
-        secret.create_token(&created_user.lamport_id, &created_user.name, &created_user.user_name);
-
-    tracing::info!("[auth_token] jwt token: {:?}", token);
-
-    Ok(Json(serde_json::json!({
-        "result": {
-            "access_token": token,
-            "user_info": UserResponse::from(created_user)
-        }
-    })))
-}
-
-// verify user
-#[debug_handler]
-pub async fn verify_user(
-    State(state): State<SharedState>,
-    AuthToken(user): AuthToken,
-    Path(address): Path<String>,
-) -> AppResult<Json<serde_json::Value>> {
-    let client = state.jwt_handler.clone();
-    let claim = client.decode_token(user).unwrap();
-    
-    //get user by uid
-    let verifier = state.store.get_user_by_uid(claim.sub.as_str()).await?;
-    if !verifier.verified {
-        return Err(AppError::InputValidateError("verifier is not verified".into()));
-    }
-
-    let _user = state.store.update_user(address.as_str(), claim.sub.as_str()).await?;
-
-    Ok(Json(serde_json::json!({
-        "result": {
-            "status": "success",
-            "address": address
-        }
-    })))
-}
-
-//login
-#[debug_handler]
-pub async fn login(
-    State(state): State<SharedState>,
-    EJson(req): EJson<LoginRequest>,
-) -> AppResult<Json<serde_json::Value>> {
-    if cfg!(not(debug_assertions)) {
-        let verified= verify_signature(&req.data, &req.sig, &req.data.address)?;
-        if !verified {
-            return Err(AppError::InvalidSignature);
-        }
-        tracing::info!("signature verified success");
-
-        let redis_client = RedisClient::from(state.redis.clone());
-
-        if let Ok(nonce) = redis_client.get_nonce(req.data.address.as_str()).await {
-            tracing::info!("got nonce: {:?} by key: {:?}", nonce, req.data.address);
-            if nonce != req.data.nonce {
-                return Err(AppError::InputValidateError("nonce verification error".into()));
-            }
-        } else {
-            tracing::error!("got nonce err: wrong address:{:?} ", req.data.address);
-            return Err(AppError::InputValidateError(
-                    "nonce is not existing".into(),
-            ));
-        }
-
-        match redis_client.del_nonce(req.data.address.as_str()).await {
-            Ok(_) => {
-                tracing::info!("delete nonce success");
-            }
-            Err(e) => {
-                tracing::error!("delete nonce err: {:?}", e);
-            }
-        }
-    }
-
-    let user = state.store.get_user_by_address(&req.data.address).await?;
-    let secret = state.jwt_handler.clone();
-    let token: String =
-        secret.create_token(&user.lamport_id, &user.name, &user.user_name);
-
-    tracing::info!("[auth_token] jwt token: {:?}", token);
-
-    Ok(Json(serde_json::json!({
-        "result": {
-            "access_token": token,
-            "user_info": UserResponse::from(user)
-        }
-    })))
-}
 

@@ -1,4 +1,5 @@
-use super::user_service;
+use crate::database::services::binding;
+use crate::database::dals::telegram_binding;
 use crate::helpers::utils::*;
 use crate::database::entities::users;
 use crate::server::auth::OauthUserInfo;
@@ -157,3 +158,85 @@ pub struct LoginData {
     pub address: String,
     pub nonce: String,
 }
+
+//struct for get binding twitter and impl from twitter_binding::Model
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BindingTwitterResponse {
+    pub x_id: String,
+    pub name: String,
+    pub user_name: String,
+    pub image_url: String,
+}
+
+impl From<binding::TwitterBinding> for BindingTwitterResponse {
+    fn from(binding: binding::TwitterBinding) -> Self {
+        Self {
+            x_id: binding.x_id,
+            name: binding.name,
+            user_name: binding.user_name,
+            image_url: binding.image_url,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct TelegramParams {
+    pub user_id: String,
+    pub token: String,
+}
+
+//telgram binding response
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BindingTelegramResponse {
+    pub lamport_id: String,
+    pub user_id: String,
+}
+
+impl From<telegram_binding::TelegramBindingModel> for BindingTelegramResponse {
+    fn from(binding: telegram_binding::TelegramBindingModel) -> Self {
+        Self {
+            lamport_id: binding.lamport_id,
+            user_id: binding.telegram_id,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TokenResponse {
+    pub access_token: String,
+    pub token_type: String,
+    pub expires_in: u64,
+    pub refresh_token: String,
+    pub scope: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct OauthDiscordInfo {
+    pub id: String,
+    pub username: String,
+    pub avatar: Option<String>,
+    pub discriminator: String,
+    pub public_flags: u64,
+    pub flags: u64,
+    pub banner: Option<String>,
+    pub accent_color: Option<String>,
+    pub global_name: String,
+    pub avatar_decoration_data: Option<String>,
+    pub banner_color: Option<String>,
+    pub clan: Option<String>,
+    pub primary_guild: Option<String>,
+    pub mfa_enabled: bool,
+    pub locale: String,
+    pub premium_type: u64,
+    pub email: String,
+    pub verified: bool,
+}
+
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GitHubUser {
+    pub login: String,
+    pub id: u64,
+    pub avatar_url: String,
+}
+

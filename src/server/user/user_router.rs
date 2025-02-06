@@ -6,9 +6,8 @@ use axum::{middleware, routing::{get,post}, Router};
 pub fn user_router(state: SharedState) -> Router<SharedState> {
     Router::new()
         .route("/user/info", get(get_user_info))
-        .route("/user/count", get(get_user_count))
         .route("/user/stats", get(get_user_stats))
-        .route("/user/bindings", post(binding_account).get(get_user_bindings))
+        .route("/user/bindings", post(binding_twitter).get(get_user_bindings))
         .route("/user/binding/telegram", post(binding_telegram))
         .route("/user/binding/discord", post(binding_discord))
         .route("/user/binding/github", post(binding_github))
@@ -22,4 +21,5 @@ pub fn user_router(state: SharedState) -> Router<SharedState> {
         .route("/users/login", post(login))
         .route("/users", post(register))
         .route("/users/:username", get(check_username))
+        .route("/user/count", get(get_user_count))
 }
