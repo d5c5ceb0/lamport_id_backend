@@ -345,3 +345,229 @@ pub async fn binding_telegram(
         "result": BindingTelegramResponse::from(binding)
     })))
 }
+
+const API_ENDPOINT: &str = "https://discord.com/api/v10";
+const CLIENT_ID: &str = "1336590096928866306";
+const CLIENT_SECRET: &str = "5DcNW65ua3Av76eQuCn0wdDz4PErna2F";
+
+#[derive(Deserialize, Debug)]
+pub struct TokenResponse {
+    access_token: String,
+    token_type: String,
+    expires_in: u64,
+    refresh_token: String,
+    scope: String,
+}
+//{\"id\":\"1142062260328603648\",\"username\":\"energetic_dove_64259\",\"avatar\":null,\"discriminator\":\"0\",\"public_flags\":0,\"flags\":0,\"banner\":null,\"accent_color\":null,\"global_name\":\"aa\",\"avatar_decoration_data\":null,\"banner_color\":null,\"clan\":null,\"primary_guild\":null,\"mfa_enabled\":false,\"locale\":\"zh-CN\",\"premium_type\":0,\"email\":\"d5c5ceb0@gmail.com\",\"verified\":true}\
+#[derive(Serialize, Deserialize, Debug)]
+pub struct OauthDiscordInfo {
+    pub id: String,
+    pub username: String,
+    pub avatar: Option<String>,
+    pub discriminator: String,
+    pub public_flags: u64,
+    pub flags: u64,
+    pub banner: Option<String>,
+    pub accent_color: Option<String>,
+    pub global_name: String,
+    pub avatar_decoration_data: Option<String>,
+    pub banner_color: Option<String>,
+    pub clan: Option<String>,
+    pub primary_guild: Option<String>,
+    pub mfa_enabled: bool,
+    pub locale: String,
+    pub premium_type: u64,
+    pub email: String,
+    pub verified: bool,
+}
+
+pub async fn binding_discord(
+    State(state): State<SharedState>,
+    AuthToken(user): AuthToken,
+    Json(params): Json<OAuthParams>,
+) -> AppResult<Json<serde_json::Value>> {
+    let client = state.jwt_handler.clone();
+    let claim = client.decode_token(user).unwrap();
+
+    tracing::info!("[auth_token] get params: {:?}", params);
+    //if existed TODO
+    //
+
+    let client = Client::new();
+
+    let token_params = [
+        ("code", params.clone().code.unwrap()),
+        ("grant_type", "authorization_code".into()),
+        ("redirect_uri", params.clone().redirect_uri.unwrap()),
+    ];
+
+    tracing::info!("[auth_token] exchange code params: {:?}", token_params);
+
+
+    let token_response= client
+        .post(&format!("{}/oauth2/token", API_ENDPOINT))
+        .header("Content-Type", "application/x-www-form-urlencoded")
+        .basic_auth(CLIENT_ID, Some(CLIENT_SECRET))
+        .form(&token_params)
+        .send()
+        .await
+        .map_err(|_e| AppError::RequestError("failed to exchange code".to_string()))?;
+
+    if !token_response.status().is_success() {
+        let error_message = token_response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Failed to read error response".to_string());
+
+        return Err(AppError::RequestError(format!(
+                    "Failed to get token. Status: Error: {}", 
+                    error_message
+        )));
+    }
+
+    let token: TokenResponse = token_response
+        .json()
+        .await
+        .map_err(|e| AppError::CustomError(e.to_string() + "Failed to parse user info"))?;
+
+    tracing::info!("[auth_token] exchange code get: {:?}", token);
+
+    let access_token = token.access_token.clone();
+
+    tracing::info!("[auth_token] Access Token: {:?}", access_token);
+
+    ///
+    let client = Client::new();
+
+    let user_info_response = client
+        .get("https://discord.com/api/v10/users/@me")
+        .bearer_auth(&access_token)
+        .send()
+        .await
+        .map_err(|_e| AppError::RequestError("failed to get user info".to_string()))?;
+
+    tracing::info!("[auth_token] get user info response: {:?}", user_info_response);
+
+    if !user_info_response.status().is_success() {
+        let error_message =user_info_response 
+            .text()
+            .await
+            .unwrap_or_else(|_| "Failed to read error response".to_string());
+        tracing::error!("[auth_token] get user error: {:?}", error_message);
+        return Err(AppError::RequestError(
+            "non user info in response".to_string(),
+        ));
+    }
+
+    let user_info: OauthDiscordInfo = user_info_response
+        .json()
+        .await
+        .map_err(|e| AppError::CustomError(e.to_string() + "Failed to parse user info"))?;
+
+    tracing::info!("[auth_token] get user info: {:?}", user_info);
+
+
+    Ok(Json(serde_json::json!({
+        "result": user_info
+    })))
+}
+
+
+const GITHUB_CLIENT_ID: &str = "Iv23lii7LrglBj8Q0mvv";
+const GITHUB_CLIENT_SECRET: &str = "7bd3652c28928d26cad5b9aa04ed12c324a86b91";
+const GITHUB_TOKEN_URL: &str = "https://github.com/login/oauth/access_token";
+const GITHUB_API_URL: &str = "https://api.github.com/user";
+
+#[derive(Debug, Serialize, Deserialize)]
+struct GitHubUser {
+    login: String,
+    id: u64,
+    avatar_url: String,
+}
+
+pub async fn binding_github(
+    State(state): State<SharedState>,
+    AuthToken(user): AuthToken,
+    Json(params): Json<OAuthParams>,
+) -> AppResult<Json<serde_json::Value>> {
+    let client = state.jwt_handler.clone();
+    let claim = client.decode_token(user).unwrap();
+
+    tracing::info!("[auth_token] get params: {:?}", params);
+    //if existed TODO
+    //
+
+    let client = Client::new();
+
+    let token_params = [
+        ("code", params.clone().code.unwrap()),
+        ("client_id", GITHUB_CLIENT_ID.into()),
+        ("client_secret", GITHUB_CLIENT_SECRET.into()),
+    ];
+
+    tracing::info!("[auth_token] exchange code params: {:?}", token_params);
+
+    let token_response= client
+        .post(GITHUB_TOKEN_URL)
+        .header("Accept", "application/json")
+        .form(&token_params)
+        .send()
+        .await
+        .map_err(|_e| AppError::RequestError("failed to exchange code".to_string()))?;
+
+    if !token_response.status().is_success() {
+        let error_message = token_response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Failed to read error response".to_string());
+
+        return Err(AppError::RequestError(format!(
+                    "Failed to get token. Status: Error: {}", 
+                    error_message
+        )));
+    }
+
+    let token: TokenResponse = token_response
+        .json()
+        .await
+        .map_err(|e| AppError::CustomError(e.to_string() + "Failed to parse user info"))?;
+
+    tracing::info!("[auth_token] exchange code get: {:?}", token);
+
+    let access_token = token.access_token.clone();
+
+    tracing::info!("[auth_token] Access Token: {:?}", access_token);
+
+    let client = Client::new();
+    let response = client
+        .get(GITHUB_API_URL)
+        .header("Authorization", format!("Bearer {}", access_token))
+        .header("User-Agent", "lamportid")
+        .send()
+        .await
+        .map_err(|_e| AppError::RequestError("failed to get user info".to_string()))?;
+
+    //let user_info = response.json::<GitHubUser>().await?;
+
+    if !response.status().is_success() {
+        let error_message =response 
+            .text()
+            .await
+            .unwrap_or_else(|_| "Failed to read error response".to_string());
+        tracing::error!("[auth_token] get user error: {:?}", error_message);
+        return Err(AppError::RequestError(
+            "non user info in response".to_string(),
+        ));
+    }
+
+    let user_info: GitHubUser = response
+        .json()
+        .await
+        .map_err(|e| AppError::CustomError(e.to_string() + "Failed to parse user info"))?;
+
+    Ok(Json(serde_json::json!({
+        "result": user_info
+    })))
+}
+
+

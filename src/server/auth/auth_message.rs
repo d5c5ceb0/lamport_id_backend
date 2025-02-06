@@ -7,7 +7,7 @@ use validator::Validate;
 pub struct OAuthCallbackParams {
     pub code: String,
     #[allow(unused)]
-    pub state: String,
+    pub state: Option<String>,
 }
 
 #[derive(Deserialize, Debug, Validate, Clone)]
