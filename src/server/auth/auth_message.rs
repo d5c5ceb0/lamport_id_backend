@@ -64,3 +64,22 @@ pub struct ExchangeTokenRespose {
     pub scope: String,
 }
 
+
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuthResponse {
+    pub code: String,
+    pub state: String,
+    pub redirect_uri: String,
+}
+
+impl AuthResponse {
+    pub fn new(code: String, state: String, redirect_uri: String) -> Self {
+        Self {
+            code,
+            state,
+            redirect_uri,
+        }
+    }
+}
+
