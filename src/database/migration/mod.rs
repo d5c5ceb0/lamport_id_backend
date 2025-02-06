@@ -10,6 +10,8 @@ mod m20250116_131947_create_group_table;
 mod m20250125_140924_create_twitter_bindings_table;
 mod m20250128_081521_create_events_table;
 mod m20250205_113811_create_telegram_bindings_table;
+mod m20250206_124937_create_discord_bindings_table;
+mod m20250206_142515_create_github_table;
 
 pub struct Migrator;
 
@@ -27,6 +29,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20250125_140924_create_twitter_bindings_table::Migration),
             Box::new(m20250128_081521_create_events_table::Migration),
             Box::new(m20250205_113811_create_telegram_bindings_table::Migration),
+            Box::new(m20250206_124937_create_discord_bindings_table::Migration),
+            Box::new(m20250206_142515_create_github_table::Migration),
         ]
     }
 }

@@ -10,6 +10,8 @@ use crate::{
         events::events_message::Event
     },
     database::dals::telegram_binding,
+    database::dals::discord_binding,
+    database::dals::github_binding,
     database::services::binding,
     nostr,
     helpers::{eip191::verify_signature, redis_cache::*},
@@ -408,7 +410,7 @@ pub async fn user_binding_discord(
     state: &SharedState,
     lamport_id: &str,
     params: &OAuthParams,
-) -> AppResult<OauthDiscordInfo> {
+) -> AppResult<discord_binding::DiscordBindingModel> {
 
     let token_params = [
         ("code", params.clone().code.unwrap()),
@@ -429,8 +431,46 @@ pub async fn user_binding_discord(
 
     tracing::info!("[auth_token] get user info: {:?}", user_info);
 
+    let binding  = discord_binding::DiscordBindingModel::new(
+        lamport_id.to_string(),
+        user_info.id.clone(),
+        user_info.username.clone(),
+    );
 
-    Ok(user_info)
+    let created_binding= match state.store.create_discord_binding(binding).await {
+        Ok(u) => u,
+        Err(AppError::UserExisted(_)) => {
+            tracing::info!("user has already existed, log in");
+            //state.store.get_twitter_binding_by_user_id(lamport_id.as_str()).await?
+            return Err(AppError::UserExisted("temp".to_string()))
+        }
+        Err(e) => return Err(e),
+    };
+
+    //award point
+    state
+        .store
+        .award_points(lamport_id.to_string(), consts::POINTS_BINDING, consts::POINTS_BINDING_VALUE, "discord")
+        .await?;
+
+    //consume energy 
+    state
+        .store
+        .create_energy(lamport_id.to_string(), consts::ENERGY_BINDING, consts::ENERGY_BINDING_VALUE)
+        .await?;
+
+
+    tracing::info!("[auth_token] database  user info: {:?}", created_binding);
+
+    ////pub fn new_kind2321(pubkey: PublicKey, lamport_id: &str, twitter: &str) -> Self {
+    //state.queue.add_queue_req_ex(consts::NOSTR_TOPIC, nostr::LamportBinding::new_kind2321(
+    //    state.nclient.get_pub_key(),
+    //    lamport_id.as_str(),
+    //    created_binding.user_name.as_str(),
+    //)).await?;
+
+
+    Ok(created_binding)
 }
 
 
@@ -438,7 +478,7 @@ pub async fn user_binding_github(
     state: &SharedState,
     lamport_id: &str,
     params: &OAuthParams,
-) -> AppResult<GitHubUser> {
+) -> AppResult<github_binding::GithubBindingModel> {
     let token_params = [
         ("code", params.clone().code.unwrap()),
         ("client_id", GITHUB_CLIENT_ID.into()),
@@ -458,7 +498,36 @@ pub async fn user_binding_github(
         .await?;
     tracing::info!("[auth_token] get user info: {:?}", user_info);
 
-    Ok(user_info)
+    let binding  = github_binding::GithubBindingModel::new(
+        lamport_id.to_string(),
+        user_info.id.to_string(),
+        user_info.login.clone(),
+    );
+
+    let created_binding= match state.store.create_github_binding(binding).await {
+        Ok(u) => u,
+        Err(AppError::UserExisted(_)) => {
+            tracing::info!("user has already existed, log in");
+            //state.store.get_twitter_binding_by_user_id(lamport_id.as_str()).await?
+            return Err(AppError::UserExisted("temp".to_string()))
+        }
+        Err(e) => return Err(e),
+    };
+
+    //award point
+    state
+        .store
+        .award_points(lamport_id.to_string(), consts::POINTS_BINDING, consts::POINTS_BINDING_VALUE, "github")
+        .await?;
+
+    //consume energy 
+    state
+        .store
+        .create_energy(lamport_id.to_string(), consts::ENERGY_BINDING, consts::ENERGY_BINDING_VALUE)
+        .await?;
+
+
+    Ok(created_binding)
 }
 
 

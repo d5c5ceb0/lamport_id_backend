@@ -2,7 +2,9 @@
 
 pub mod prelude;
 
+pub mod discord_binding;
 pub mod events;
+pub mod github_binding;
 pub mod groups;
 pub mod lamport_id;
 pub mod points;
