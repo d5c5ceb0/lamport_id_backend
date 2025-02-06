@@ -9,7 +9,6 @@ pub mod webset;
 pub mod group;
 pub mod proposal;
 pub mod vote;
-pub mod users;
 pub mod events;
 pub mod contributions;
 pub mod referrals;
