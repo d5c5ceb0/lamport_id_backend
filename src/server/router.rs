@@ -2,7 +2,6 @@ use super::{
     auth::auth_router,
     health::health_router,
     user::user_router,
-    webset::index_router,
     group::group_router,
     proposal::proposal_router,
     vote::vote_router,
@@ -22,7 +21,6 @@ use tower_http::{
 pub fn app_router(state: SharedState) -> Router {
     let user_router = user_router(state.clone());
     let auth_router = auth_router(state.clone());
-    let index_router = index_router();
     let health_router = health_router();
     let group_router = group_router(state.clone());
     let proposal_router = proposal_router(state.clone());
@@ -32,7 +30,6 @@ pub fn app_router(state: SharedState) -> Router {
     let referral_router = referral_router(state.clone());
 
     Router::new()
-        .nest("/", index_router)
         .nest("/api/v1/", user_router)
         .nest("/api/v1/health", health_router)
         .nest("/api/v1/auth", auth_router)

@@ -5,7 +5,6 @@ pub mod middlewares;
 pub mod router;
 pub mod server;
 pub mod user;
-pub mod webset;
 pub mod group;
 pub mod proposal;
 pub mod vote;
