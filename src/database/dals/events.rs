@@ -9,17 +9,6 @@ use sea_orm::*;
 use uuid::Uuid;
 
 impl Storage {
-//pub struct Model {
-//    #[sea_orm(primary_key)]
-//    pub id: i32,
-//    #[sea_orm(unique)]
-//    pub event_id: String,
-//    pub lamport_id: String,
-//    pub etype: String,
-//    pub content: String,
-//    pub created_at: DateTimeWithTimeZone,
-//}
-
     //create events
     pub async fn create_event(
         &self,

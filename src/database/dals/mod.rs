@@ -1,4 +1,11 @@
 pub mod points;
+pub mod power;
+pub mod group;
+pub mod events;
+pub mod users;
+pub mod vote;
+pub mod proposal;
+pub mod lamport_id;
 pub mod twitter_binding;
 pub mod telegram_binding;
 pub mod discord_binding;
