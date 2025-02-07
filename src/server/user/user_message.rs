@@ -1,4 +1,4 @@
-use crate::database::services::binding;
+use crate::database::caches::binding;
 use crate::database::dals::telegram_binding;
 use crate::helpers::utils::*;
 use crate::database::entities::users;

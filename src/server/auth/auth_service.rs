@@ -4,7 +4,6 @@ use crate::{
     common::error::AppResult,
     helpers::redis_cache::*,
 };
-use serde::{Deserialize, Serialize};
 
 pub async fn auth_callback_handler(
     state: &SharedState,

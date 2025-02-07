@@ -1,6 +1,6 @@
 pub mod entities;
 pub mod migration;
-pub mod services;
+pub mod caches;
 pub mod dals;
 
 use crate::common::{config::DatabaseConfig, error::AppResult};

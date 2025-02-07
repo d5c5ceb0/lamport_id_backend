@@ -1,5 +1,5 @@
 use serde::{Serialize, Deserialize};
-use crate::database::services::binding;
+use crate::database::caches::binding;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct TwitterContribution {

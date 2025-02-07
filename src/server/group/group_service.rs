@@ -3,13 +3,6 @@ use crate::{
     common::error::AppResult,
     helpers::redis_cache::*,
     app::SharedState,
-    server::{
-        vote::vote_service::{
-            //count_votes_by_group_id,
-            //count_voters_by_group_id,
-        },
-        //proposal::proposal_service::count_proposals_by_groupid,
-    }
 };
 
 const GROUP_LIST_KEY : &str = "group:list";

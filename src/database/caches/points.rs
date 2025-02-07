@@ -4,7 +4,6 @@ use crate::{
         dals::points,
         Storage,
     },
-    helpers::redis_cache::*,
 };
 
 pub type Point = points::PointModel;

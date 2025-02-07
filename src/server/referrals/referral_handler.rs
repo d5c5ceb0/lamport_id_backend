@@ -1,20 +1,10 @@
-//use super::referral_message::*;
 use super::referral_service::*;
 use crate::{
     app::SharedState, 
-    common::{
-        error::AppResult, 
-        consts
-    },
-    server::{
-        middlewares::AuthToken,
-        auth::auth_message::*
-    },
-    database::services::points,
-    nostr,
+    common::error::AppResult,
+    server::middlewares::AuthToken,
 };
 use axum::{debug_handler, extract::State, Json};
-use serde::{Deserialize, Serialize};
 
 #[debug_handler]
 pub async fn get_referral(

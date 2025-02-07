@@ -12,7 +12,7 @@ use crate::{
     database::dals::telegram_binding,
     database::dals::discord_binding,
     database::dals::github_binding,
-    database::services::binding,
+    database::caches::binding,
     nostr,
     helpers::{eip191::verify_signature, redis_cache::*},
 };
