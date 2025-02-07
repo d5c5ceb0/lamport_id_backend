@@ -1,5 +1,5 @@
-use crate::database::caches::binding;
-use crate::database::dals::telegram_binding;
+use crate::database::{caches::binding, dals::discord_binding};
+use crate::database::dals::{github_binding, telegram_binding};
 use crate::helpers::utils::*;
 use crate::database::entities::users;
 use crate::server::auth::OauthUserInfo;
@@ -160,7 +160,7 @@ pub struct LoginData {
 }
 
 //struct for get binding twitter and impl from twitter_binding::Model
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct BindingTwitterResponse {
     pub x_id: String,
     pub name: String,
@@ -186,7 +186,7 @@ pub struct TelegramParams {
 }
 
 //telgram binding response
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct BindingTelegramResponse {
     pub lamport_id: String,
     pub user_id: String,
@@ -197,6 +197,35 @@ impl From<telegram_binding::TelegramBindingModel> for BindingTelegramResponse {
         Self {
             lamport_id: binding.lamport_id,
             user_id: binding.telegram_id,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct BindingDiscordResponse {
+    pub lamport_id: String,
+    pub user_id: String,
+}
+impl From<discord_binding::DiscordBindingModel> for BindingDiscordResponse {
+    fn from(binding: discord_binding::DiscordBindingModel) -> Self {
+        Self {
+            lamport_id: binding.lamport_id,
+            user_id: binding.discord_id,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct BindingGithubResponse {
+    pub lamport_id: String,
+    pub user_id: String,
+}
+
+impl From<github_binding::GithubBindingModel> for BindingGithubResponse {
+    fn from(binding: github_binding::GithubBindingModel) -> Self {
+        Self {
+            lamport_id: binding.lamport_id,
+            user_id: binding.github_id,
         }
     }
 }

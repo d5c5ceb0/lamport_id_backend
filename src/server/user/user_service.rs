@@ -1,20 +1,11 @@
 use super::user_message::*;
 use crate::{
-    app::SharedState, 
-    common::{
-        error::{AppResult, AppError}, 
-        consts
-    },
-    server::{
+    app::SharedState, common::{
+        consts, error::{AppError, AppResult}
+    }, database::{caches::binding, dals::{discord_binding, github_binding, telegram_binding, twitter_binding}}, helpers::{eip191::verify_signature, redis_cache::*}, nostr, server::{
         auth::auth_message::*,
         events::events_message::Event
-    },
-    database::dals::telegram_binding,
-    database::dals::discord_binding,
-    database::dals::github_binding,
-    database::caches::binding,
-    nostr,
-    helpers::{eip191::verify_signature, redis_cache::*},
+    }
 };
 use reqwest::Client;
 
@@ -341,6 +332,37 @@ pub async fn user_binding_twitter(
     Ok(BindingTwitterResponse::from(created_binding))
 }
 
+pub async fn user_get_user_bindings(
+    state: &SharedState,
+    lamport_id: &str,
+) -> AppResult<(BindingTwitterResponse, BindingTelegramResponse, BindingDiscordResponse, BindingGithubResponse)> {
+
+    let x_binding = match user_get_twitter_binding(state, lamport_id).await {
+        Ok(binding) => binding,
+        Err(AppError::CustomError(_)) => BindingTwitterResponse::default(),
+        Err(e) => return Err(e),
+    };
+    let tg_binding = match user_get_telegram_binding(state, lamport_id).await {
+        Ok(binding) => binding,
+        Err(AppError::CustomError(_)) => BindingTelegramResponse::default(),
+        Err(e) => return Err(e),
+    };
+
+    let dc_binding = match user_get_discord_binding(state, lamport_id).await {
+        Ok(binding) => binding,
+        Err(AppError::CustomError(_)) => BindingDiscordResponse::default(),
+        Err(e) => return Err(e),
+    };
+
+    let gh_binding = match user_get_github_binding(state, lamport_id).await {
+        Ok(binding) => binding,
+        Err(AppError::CustomError(_)) => BindingGithubResponse::default(),
+        Err(e) => return Err(e),
+    };
+
+    Ok((x_binding, tg_binding, dc_binding, gh_binding))
+}
+
 
 pub async fn user_get_twitter_binding(
     state: &SharedState,
@@ -348,6 +370,36 @@ pub async fn user_get_twitter_binding(
 ) -> AppResult<BindingTwitterResponse> {
     match state.store.get_twitter_binding_by_user_id(lamport_id).await {
         Ok(binding) => Ok(BindingTwitterResponse::from(binding)),
+        Err(e) => Err(e),
+    }
+}
+
+pub async fn user_get_telegram_binding(
+    state: &SharedState,
+    lamport_id: &str,
+) -> AppResult<BindingTelegramResponse> {
+    match state.store.get_telegram_binding_by_lamport_id(lamport_id).await {
+        Ok(binding) => Ok(BindingTelegramResponse::from(binding)),
+        Err(e) => Err(e),
+    }
+}
+
+pub async fn user_get_discord_binding(
+    state: &SharedState,
+    lamport_id: &str,
+) -> AppResult<BindingDiscordResponse> {
+    match state.store.get_discord_binding_by_lamport_id(lamport_id).await {
+        Ok(binding) => Ok(BindingDiscordResponse::from(binding)),
+        Err(e) => Err(e),
+    }
+}
+
+pub async fn user_get_github_binding(
+    state: &SharedState,
+    lamport_id: &str,
+) -> AppResult<BindingGithubResponse> {
+    match state.store.get_github_binding_by_lamport_id(lamport_id).await {
+        Ok(binding) => Ok(BindingGithubResponse::from(binding)),
         Err(e) => Err(e),
     }
 }

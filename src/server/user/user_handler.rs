@@ -151,19 +151,27 @@ pub async fn get_user_bindings(
     let client = state.jwt_handler.clone();
     let claim = client.decode_token(user).unwrap();
 
-    match user_get_twitter_binding(&state, claim.sub.as_str()).await {
-        Ok(binding) => Ok(Json(serde_json::json!({
+    match user_get_user_bindings(&state, claim.sub.as_str()).await {
+        Ok(bindings) => {
+            tracing::info!("get user bindings: {:?}", bindings);
+            Ok(Json(serde_json::json!({
                 "result": {
-                    "twitter_info": binding
+                    "twitter_info": bindings.0,
+                    "telegram_info": bindings.1,
+                    "discord_info": bindings.2,
+                    "github_info": bindings.3,
                 }
-            }))),
-        Err(AppError::CustomError(_)) => Ok(Json(serde_json::json!({
-                "result": {
-                    "twitter_info": {}
-                }
-            }))),
-        Err(e) => Err(e),
-
+            })),
+        )
+        }
+        Err(_e) => Ok(Json(serde_json::json!({
+            "result": {
+                "twitter_info": {},
+                "telegram_info": {},
+                "discord_info": {},
+                "github_info": {},
+            }
+        }))),
     }
 }
 
